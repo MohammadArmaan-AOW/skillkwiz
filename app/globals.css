@@ -1,0 +1,190 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* ─────────────────────────
+       Base
+    ───────────────────────── */
+
+    --background: 0 0% 100%;
+    --foreground: 220 25% 12%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 220 25% 12%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 25% 12%;
+
+    /* ─────────────────────────
+       SkillKwiz Brand Colours
+       ───────────────────────── */
+
+    /* Primary Blue #00418D */
+    --primary: 212 100% 28%;
+    --primary-foreground: 0 0% 100%;
+
+    /* Secondary Red #F73E5D */
+    --secondary: 349 92% 60%;
+    --secondary-foreground: 0 0% 100%;
+
+    /* ─────────────────────────
+       Supporting UI
+       ───────────────────────── */
+
+    /* Soft Blue */
+    --muted: 210 60% 97%;
+    --muted-foreground: 215 16% 42%;
+
+    /* Accent Pink #FF6B81 */
+    --accent: 350 100% 71%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 214 25% 90%;
+    --input: 214 25% 90%;
+
+    --ring: 212 100% 28%;
+
+    --radius: 0.625rem;
+  }
+
+  .dark {
+    --background: 220 30% 7%;
+    --foreground: 210 40% 98%;
+
+    --card: 220 28% 10%;
+    --card-foreground: 210 40% 98%;
+
+    --popover: 220 28% 10%;
+    --popover-foreground: 210 40% 98%;
+
+    /* Brighter blue for dark mode */
+    --primary: 210 78% 52%;
+    --primary-foreground: 0 0% 100%;
+
+    /* Red */
+    --secondary: 349 92% 60%;
+    --secondary-foreground: 0 0% 100%;
+
+    --muted: 215 30% 15%;
+    --muted-foreground: 214 20% 70%;
+
+    /* Pink */
+    --accent: 350 100% 71%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 62% 45%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 215 30% 20%;
+    --input: 215 30% 20%;
+
+    --ring: 210 78% 52%;
+  }
+}
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: "Inter", sans-serif;
+  }
+}
+
+/* ─────────────────────────
+   SkillKwiz Brand Gradients
+   ───────────────────────── */
+
+@layer utilities {
+  /* Main SkillKwiz gradient */
+  .bg-primary-gradient {
+    @apply bg-gradient-to-r from-[#00418D] via-[#126BC1] to-[#2388E5];
+  }
+
+  .text-primary-gradient {
+    @apply bg-gradient-to-r from-[#00418D] via-[#126BC1] to-[#2388E5]
+      bg-clip-text text-transparent;
+  }
+
+  /* Blue → Red gradient for special CTAs */
+  .bg-brand-gradient {
+    @apply bg-gradient-to-r from-[#00418D] via-[#2388E5] to-[#F73E5D];
+  }
+
+  .text-brand-gradient {
+    @apply bg-gradient-to-r from-[#00418D] via-[#2388E5] to-[#F73E5D]
+      bg-clip-text text-transparent;
+  }
+}
+
+/* ─────────────────────────
+   Components
+   ───────────────────────── */
+
+@layer components {
+  .blog-card {
+    @apply overflow-hidden rounded-lg bg-card shadow-sm
+      transition-shadow duration-300 hover:shadow-md;
+  }
+
+  .blog-title {
+    @apply text-xl font-bold text-primary
+      transition-colors duration-200 hover:text-secondary;
+  }
+
+  .blog-meta {
+    @apply text-sm text-muted-foreground;
+  }
+
+  .btn-primary {
+    @apply rounded-full bg-primary px-6 py-2 text-primary-foreground
+      transition-colors duration-200 hover:bg-secondary;
+  }
+
+  .btn-secondary {
+    @apply rounded-full bg-secondary px-6 py-2 text-secondary-foreground
+      transition-colors duration-200 hover:bg-primary;
+  }
+}
+
+/* ─────────────────────────
+   Logo Typography
+   ───────────────────────── */
+
+.skillkwiz-logo-text {
+  font-family: "Aardvark Cafe", sans-serif;
+  color: #69226f;
+  font-size: 36px;
+}
+
+.how-much-do-you-know {
+  font-family: "GardensC", sans-serif;
+  color: #000000;
+  font-size: 23.5px;
+}
+
+/* ─────────────────────────
+   Legacy Icon Colours
+   ───────────────────────── */
+
+.icon-orange {
+  color: #ff9d00;
+}
+
+.icon-cyan {
+  color: #48caed;
+}
+
+.icon-red {
+  color: #f73c5c;
+}
+
+.icon-blue {
+  color: #2a8bea;
+}
