@@ -483,6 +483,10 @@ function CardContent({
                         height={80}
                         loading="lazy"
                         className="h-20 w-20 object-cover"
+                        style={{
+                            width: "auto",
+                            height: "auto",
+                        }}
                     />
                 </div>
             </div>

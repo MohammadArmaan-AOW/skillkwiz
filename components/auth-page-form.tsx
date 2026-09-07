@@ -1,31 +1,46 @@
 "use client";
 
 import Link from "next/link";
-import { motion, useReducedMotion } from "framer-motion";
-import { Eye, EyeOff, LockKeyhole, Mail, UserRound } from "lucide-react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 
+import { motion, useReducedMotion } from "framer-motion";
+
+import {
+    ArrowLeft,
+    Eye,
+    EyeOff,
+    LockKeyhole,
+    Mail,
+    Sparkles,
+    UserRound,
+} from "lucide-react";
+
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+
+import { useSignIn } from "@/hooks/queries/employer/useSignIn";
+import { useSignUp } from "@/hooks/queries/employer/useSignUp";
+import { useVerifyEmail } from "@/hooks/queries/employer/useVerifyEmail";
 
 type AuthMode = "login" | "signup";
-type Role = "employee" | "employer";
+type LoginRole = "employee" | "employer";
 
 const copy = {
     login: {
         eyebrow: "Welcome back",
         title: "Sign in to SkillKwiz",
-        description: "Continue where your skill journey left off.",
+        description:
+            "Continue where your skill journey left off.",
         action: "Sign in",
         switchText: "New to SkillKwiz?",
         switchAction: "Create an account",
         switchHref: "/signup",
     },
+
     signup: {
         eyebrow: "Start with clarity",
-        title: "Create your account",
-        description: "Set up your SkillKwiz workspace in a few moments.",
+        title: "Create your employer account",
+        description:
+            "Set up your SkillKwiz employer workspace in a few moments.",
         action: "Create account",
         switchText: "Already have an account?",
         switchAction: "Sign in",
@@ -33,103 +48,360 @@ const copy = {
     },
 } as const;
 
-export default function AuthPageForm({ mode }: { mode: AuthMode }) {
-    const router = useRouter();
-    const pathname = usePathname();
-    const searchParams = useSearchParams();
+export default function AuthPageForm({
+    mode,
+    role,
+}: {
+    mode: AuthMode;
+    role?: LoginRole;
+}) {
     const reduceMotion = useReducedMotion();
-    const [showPassword, setShowPassword] = useState(false);
-    const [showConfirmation, setShowConfirmation] = useState(false);
+
+    const [showPassword, setShowPassword] =
+        useState(false);
+
+    const [showConfirmation, setShowConfirmation] =
+        useState(false);
+
+    const [email, setEmail] = useState("");
+    const [otp, setOtp] = useState("");
+
+    const [isVerificationStep, setIsVerificationStep] =
+        useState(false);
+
     const [message, setMessage] = useState("");
-    const role: Role =
-        searchParams.get("role") === "employer" ? "employer" : "employee";
-    const isSubmitted = searchParams.get("submitted") === "1";
+
+    const {
+        mutate: signUp,
+        isPending: isSigningUp,
+        error: signUpError,
+    } = useSignUp();
+
+    const {
+        mutate: verifyEmail,
+        isPending: isVerifyingEmail,
+        error: verifyEmailError,
+    } = useVerifyEmail();
+
+    const {
+        mutate: signIn,
+        isPending: isSigningIn,
+        error: signInError,
+    } = useSignIn();
+
     const content = copy[mode];
 
-    const setRole = (nextRole: Role) => {
-        const params = new URLSearchParams(searchParams.toString());
-        params.set("role", nextRole);
-        params.delete("submitted");
-        router.replace(`${pathname}?${params.toString()}`, { scroll: false });
-        setMessage("");
-    };
-
-    const submit = (event: React.FormEvent<HTMLFormElement>) => {
+    const submit = (
+        event: React.FormEvent<HTMLFormElement>,
+    ) => {
         event.preventDefault();
-        const params = new URLSearchParams(searchParams.toString());
-        params.set("submitted", "1");
-        router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+
+        const formData = new FormData(
+            event.currentTarget,
+        );
+
+        const formEmail = String(
+            formData.get("email") || "",
+        )
+            .trim()
+            .toLowerCase();
+
+        const password = String(
+            formData.get("password") || "",
+        );
+
+        setMessage("");
+
+        if (mode === "signup") {
+            const fullName = String(
+                formData.get("name") || "",
+            ).trim();
+
+            const confirmPassword = String(
+                formData.get("confirm-password") || "",
+            );
+
+            signUp(
+                {
+                    fullName,
+                    email: formEmail,
+                    password,
+                    confirmPassword,
+                },
+                {
+                    onSuccess: () => {
+                        setEmail(formEmail);
+                        setIsVerificationStep(true);
+                        setMessage(
+                            "We sent a 6-digit verification code to your email.",
+                        );
+                    },
+                },
+            );
+
+            return;
+        }
+
+        if (role === "employer") {
+            signIn(
+                {
+                    email: formEmail,
+                    password,
+                },
+                {
+                    onSuccess: () => {
+                        window.location.href =
+                            "/services/employer/profile";
+                    },
+                },
+            );
+
+            return;
+        }
+
         setMessage(
-            mode === "login"
-                ? "You’re signed in for this frontend preview."
-                : "Your account is ready for this frontend preview.",
+            "Employee sign in will be connected next.",
         );
     };
 
-    const transition = { duration: 0.45, ease: [0.22, 1, 0.36, 1] as const };
-    const submittedMessage =
-        mode === "login"
-            ? "You’re signed in for this frontend preview."
-            : "Your account is ready for this frontend preview.";
+    const submitVerification = (
+        event: React.FormEvent<HTMLFormElement>,
+    ) => {
+        event.preventDefault();
+
+        setMessage("");
+
+        verifyEmail(
+            {
+                email,
+                otp,
+            },
+            {
+                onSuccess: () => {
+                    window.location.href =
+                        "/services/employer/profile";
+                },
+            },
+        );
+    };
+
+    const error =
+        mode === "signup"
+            ? signUpError
+            : signInError;
+
+    const transition = {
+        duration: 0.45,
+        ease: [0.22, 1, 0.36, 1] as const,
+    };
+
+    if (
+        mode === "signup" &&
+        isVerificationStep
+    ) {
+        return (
+            <motion.div
+                initial={
+                    reduceMotion
+                        ? false
+                        : {
+                              opacity: 0,
+                              y: 20,
+                          }
+                }
+                animate={{
+                    opacity: 1,
+                    y: 0,
+                }}
+                transition={transition}
+                className="w-full max-w-md rounded-2xl border border-border bg-card p-5 shadow-xl shadow-primary/5 sm:p-7"
+            >
+                <p className="text-sm font-semibold uppercase tracking-wide text-secondary">
+                    Verify your email
+                </p>
+
+                <h1 className="mt-1 text-3xl font-semibold tracking-tight">
+                    Check your inbox
+                </h1>
+
+                <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                    We sent a 6-digit verification
+                    code to{" "}
+                    <span className="font-medium text-foreground">
+                        {email}
+                    </span>
+                    .
+                </p>
+
+                {message && (
+                    <motion.p
+                        initial={{
+                            opacity: 0,
+                            y: -5,
+                        }}
+                        animate={{
+                            opacity: 1,
+                            y: 0,
+                        }}
+                        className="mt-4 rounded-lg border border-primary/20 bg-primary/10 px-3 py-2 text-sm text-primary"
+                    >
+                        {message}
+                    </motion.p>
+                )}
+
+                {verifyEmailError && (
+                    <motion.p
+                        initial={{
+                            opacity: 0,
+                            y: -5,
+                        }}
+                        animate={{
+                            opacity: 1,
+                            y: 0,
+                        }}
+                        className="mt-4 rounded-lg border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+                    >
+                        {verifyEmailError.message}
+                    </motion.p>
+                )}
+
+                <form
+                    onSubmit={submitVerification}
+                    className="mt-6 space-y-4"
+                >
+                    <label className="block">
+                        <span className="mb-2 block text-sm font-medium">
+                            Verification code
+                        </span>
+
+                        <input
+                            required
+                            value={otp}
+                            onChange={(event) => {
+                                setOtp(
+                                    event.target.value
+                                        .replace(
+                                            /\D/g,
+                                            "",
+                                        )
+                                        .slice(0, 6),
+                                );
+                            }}
+                            inputMode="numeric"
+                            autoComplete="one-time-code"
+                            maxLength={6}
+                            placeholder="000000"
+                            className="h-12 w-full rounded-lg border border-border bg-background px-4 text-center text-lg tracking-[0.5em] outline-none transition placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/20"
+                        />
+                    </label>
+
+                    <Button
+                        type="submit"
+                        disabled={
+                            isVerifyingEmail ||
+                            otp.length !== 6
+                        }
+                        className="w-full rounded-lg"
+                    >
+                        {isVerifyingEmail
+                            ? "Verifying..."
+                            : "Verify Email"}
+                    </Button>
+                </form>
+
+                <button
+                    type="button"
+                    onClick={() => {
+                        setIsVerificationStep(false);
+                        setOtp("");
+                        setMessage("");
+                    }}
+                    className="mt-5 flex w-full items-center justify-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground"
+                >
+                    <ArrowLeft className="size-4" />
+                    Back to sign up
+                </button>
+            </motion.div>
+        );
+    }
 
     return (
         <motion.div
-            initial={reduceMotion ? false : { opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
+            initial={
+                reduceMotion
+                    ? false
+                    : {
+                          opacity: 0,
+                          y: 20,
+                      }
+            }
+            animate={{
+                opacity: 1,
+                y: 0,
+            }}
             transition={transition}
             className="w-full max-w-md rounded-2xl border border-border bg-card p-5 shadow-xl shadow-primary/5 sm:p-7"
         >
-            <p className="text-sm font-semibold text-secondary uppercase tracking-wide">
+            <p className="text-sm font-semibold uppercase tracking-wide text-secondary">
                 {content.eyebrow}
             </p>
+
             <h1 className="mt-1 text-3xl font-semibold tracking-tight">
                 {content.title}
             </h1>
+
             <p className="mt-2 text-sm leading-6 text-muted-foreground">
                 {content.description}
             </p>
-            <div
-                className="mt-6 grid grid-cols-2 rounded-xl bg-muted p-1"
-                role="group"
-                aria-label="Account type"
-            >
-                {(["employee", "employer"] as const).map((option) => (
-                    <button
-                        key={option}
-                        type="button"
-                        onClick={() => setRole(option)}
-                        className={cn(
-                            "relative rounded-lg px-3 py-2 text-sm font-medium capitalize transition-colors",
-                            role === option
-                                ? "text-foreground"
-                                : "text-muted-foreground hover:text-foreground",
-                        )}
-                    >
-                        {role === option && (
-                            <motion.span
-                                layoutId="auth-role"
-                                className="absolute inset-0 -z-0 rounded-lg bg-card shadow-sm"
-                                transition={{
-                                    type: "spring",
-                                    stiffness: 360,
-                                    damping: 30,
-                                }}
-                            />
-                        )}
-                        <span className="relative z-10">{option}</span>
-                    </button>
-                ))}
-            </div>
-            {(message || isSubmitted) && (
+
+            {mode === "signup" && (
+                <div className="mt-5 flex items-start gap-3 rounded-xl border border-primary/20 bg-primary/10 p-3">
+                    <Sparkles className="mt-0.5 size-4 shrink-0 text-primary" />
+
+                    <p className="text-sm leading-5 text-foreground/80">
+                        Employer accounts are used to
+                        create assessments, manage
+                        candidates, and review results.
+                    </p>
+                </div>
+            )}
+
+            {message && (
                 <motion.p
-                    initial={{ opacity: 0, y: -5 }}
-                    animate={{ opacity: 1, y: 0 }}
+                    initial={{
+                        opacity: 0,
+                        y: -5,
+                    }}
+                    animate={{
+                        opacity: 1,
+                        y: 0,
+                    }}
                     className="mt-4 rounded-lg border border-primary/20 bg-primary/10 px-3 py-2 text-sm text-primary"
                 >
-                    {message || submittedMessage}
+                    {message}
                 </motion.p>
             )}
-            <form onSubmit={submit} className="mt-6 space-y-4">
+
+            {error && (
+                <motion.p
+                    initial={{
+                        opacity: 0,
+                        y: -5,
+                    }}
+                    animate={{
+                        opacity: 1,
+                        y: 0,
+                    }}
+                    className="mt-4 rounded-lg border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+                >
+                    {error.message}
+                </motion.p>
+            )}
+
+            <form
+                onSubmit={submit}
+                className="mt-6 space-y-4"
+            >
                 {mode === "signup" && (
                     <Field
                         label="Full name"
@@ -139,6 +411,7 @@ export default function AuthPageForm({ mode }: { mode: AuthMode }) {
                         autoComplete="name"
                     />
                 )}
+
                 <Field
                     label="Email"
                     id="email"
@@ -147,41 +420,56 @@ export default function AuthPageForm({ mode }: { mode: AuthMode }) {
                     placeholder="you@example.com"
                     autoComplete="email"
                 />
+
                 <PasswordField
                     label="Password"
                     id="password"
                     visible={showPassword}
-                    onToggle={() => setShowPassword((value) => !value)}
+                    onToggle={() =>
+                        setShowPassword(
+                            (value) => !value,
+                        )
+                    }
                     autoComplete={
-                        mode === "login" ? "current-password" : "new-password"
+                        mode === "login"
+                            ? "current-password"
+                            : "new-password"
                     }
                 />
+
                 {mode === "signup" && (
                     <PasswordField
                         label="Confirm password"
                         id="confirm-password"
                         visible={showConfirmation}
-                        onToggle={() => setShowConfirmation((value) => !value)}
+                        onToggle={() =>
+                            setShowConfirmation(
+                                (value) => !value,
+                            )
+                        }
                         autoComplete="new-password"
                     />
                 )}
+
                 {mode === "login" && (
                     <div className="flex items-center justify-between text-sm">
                         <label className="flex items-center gap-2 text-muted-foreground">
                             <input
                                 type="checkbox"
                                 className="size-4 accent-primary"
-                            />{" "}
+                            />
                             Remember me
                         </label>
-                        <a
-                            href="#"
+
+                        <Link
+                            href="/forgot-password"
                             className="font-medium text-secondary hover:underline"
                         >
                             Forgot password?
-                        </a>
+                        </Link>
                     </div>
                 )}
+
                 {mode === "signup" && (
                     <label className="flex items-start gap-2 text-xs leading-5 text-muted-foreground">
                         <input
@@ -189,31 +477,51 @@ export default function AuthPageForm({ mode }: { mode: AuthMode }) {
                             type="checkbox"
                             className="mt-0.5 size-4 shrink-0 accent-primary"
                         />
-                        I agree to the{" "}
-                        <a
-                            href="#"
-                            className="font-medium text-primary hover:underline"
-                        >
-                            Terms of Service
-                        </a>{" "}
-                        and{" "}
-                        <a
-                            href="#"
-                            className="font-medium text-primary hover:underline"
-                        >
-                            Privacy Policy
-                        </a>
-                        .
+
+                        <span>
+                            I agree to the{" "}
+                            <a
+                                href="#"
+                                className="font-medium text-primary hover:underline"
+                            >
+                                Terms of Service
+                            </a>{" "}
+                            and{" "}
+                            <a
+                                href="#"
+                                className="font-medium text-primary hover:underline"
+                            >
+                                Privacy Policy
+                            </a>
+                            .
+                        </span>
                     </label>
                 )}
-                <Button type="submit" className="w-full rounded-lg">
-                    {content.action}
+
+                <Button
+                    type="submit"
+                    disabled={
+                        mode === "signup"
+                            ? isSigningUp
+                            : isSigningIn
+                    }
+                    className="w-full rounded-lg"
+                >
+                    {mode === "signup"
+                        ? isSigningUp
+                            ? "Creating account..."
+                            : content.action
+                        : isSigningIn
+                            ? "Signing in..."
+                            : content.action}
                 </Button>
             </form>
+
             <p className="mt-6 text-center text-sm text-muted-foreground">
                 {content.switchText}{" "}
+
                 <Link
-                    href={`${content.switchHref}?role=${role}`}
+                    href={content.switchHref}
                     className="font-semibold text-secondary hover:underline"
                 >
                     {content.switchAction}
@@ -240,12 +548,17 @@ function Field({
 }) {
     return (
         <label className="block">
-            <span className="mb-2 block text-sm font-medium">{label}</span>
+            <span className="mb-2 block text-sm font-medium">
+                {label}
+            </span>
+
             <span className="relative block">
                 <Icon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+
                 <input
                     required
                     id={id}
+                    name={id}
                     type={type}
                     placeholder={placeholder}
                     autoComplete={autoComplete}
@@ -271,21 +584,35 @@ function PasswordField({
 }) {
     return (
         <label className="block">
-            <span className="mb-2 block text-sm font-medium">{label}</span>
+            <span className="mb-2 block text-sm font-medium">
+                {label}
+            </span>
+
             <span className="relative block">
                 <LockKeyhole className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+
                 <input
                     required
                     id={id}
-                    type={visible ? "text" : "password"}
+                    name={id}
+                    type={
+                        visible
+                            ? "text"
+                            : "password"
+                    }
                     placeholder="Enter your password"
                     autoComplete={autoComplete}
                     className="h-11 w-full rounded-lg border border-border bg-background pl-10 pr-11 text-sm outline-none transition placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/20"
                 />
+
                 <button
                     type="button"
                     onClick={onToggle}
-                    aria-label={visible ? "Hide password" : "Show password"}
+                    aria-label={
+                        visible
+                            ? "Hide password"
+                            : "Show password"
+                    }
                     className="absolute right-0 top-0 flex size-11 items-center justify-center text-muted-foreground hover:text-foreground"
                 >
                     {visible ? (

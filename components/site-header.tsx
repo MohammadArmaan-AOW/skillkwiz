@@ -137,9 +137,7 @@ export default function SiteHeader() {
                     "border border-border/60",
                     "bg-background/90 backdrop-blur-xl",
                     "transition-shadow duration-300",
-                    isScrolled
-                        ? "shadow-md shadow-black/5"
-                        : "shadow-sm"
+                    isScrolled ? "shadow-md shadow-black/5" : "shadow-sm",
                 )}
             >
                 {/* ---------------------------------------------
@@ -200,17 +198,15 @@ export default function SiteHeader() {
                                 <Link
                                     key={href}
                                     href={href}
-                                    aria-current={
-                                        isActive ? "page" : undefined
-                                    }
+                                    aria-current={isActive ? "page" : undefined}
                                     className={cn(
                                         "group relative rounded-md px-3 py-2 text-sm font-medium",
                                         "transition-colors duration-200",
                                         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
                                         "lg:px-4",
                                         isActive
-    ? "bg-gradient-to-r from-purple-600 via-blue-500 to-red-500 bg-clip-text text-transparent"
-    : "text-muted-foreground hover:bg-gradient-to-r hover:from-purple-600 hover:via-blue-500 hover:to-red-500 hover:bg-clip-text hover:text-transparent"
+                                            ? "bg-gradient-to-r from-purple-600 via-blue-500 to-red-500 bg-clip-text text-transparent"
+                                            : "text-muted-foreground hover:bg-gradient-to-r hover:from-purple-600 hover:via-blue-500 hover:to-red-500 hover:bg-clip-text hover:text-transparent",
                                     )}
                                 >
                                     {label}
@@ -246,9 +242,7 @@ export default function SiteHeader() {
                         variant="ghost"
                         size="icon"
                         className="md:hidden"
-                        onClick={() =>
-                            setIsMenuOpen((open) => !open)
-                        }
+                        onClick={() => setIsMenuOpen((open) => !open)}
                         aria-expanded={isMenuOpen}
                         aria-controls="mobile-navigation"
                         aria-label={
@@ -257,10 +251,7 @@ export default function SiteHeader() {
                                 : "Open navigation menu"
                         }
                     >
-                        <AnimatePresence
-                            mode="wait"
-                            initial={false}
-                        >
+                        <AnimatePresence mode="wait" initial={false}>
                             {isMenuOpen ? (
                                 <motion.div
                                     key="close"
@@ -283,10 +274,7 @@ export default function SiteHeader() {
                                         duration: 0.2,
                                     }}
                                 >
-                                    <X
-                                        aria-hidden="true"
-                                        className="h-5 w-5"
-                                    />
+                                    <X aria-hidden="true" className="h-5 w-5" />
                                 </motion.div>
                             ) : (
                                 <motion.div
@@ -350,53 +338,49 @@ export default function SiteHeader() {
                             className="absolute left-0 right-0 top-full mt-3 md:hidden"
                         >
                             <div className="overflow-hidden rounded-2xl border border-border/60 bg-background/95 p-2 shadow-lg backdrop-blur-xl">
-                                {NAV_LINKS.map(
-                                    ({ href, label }, index) => {
-                                        const isActive =
-                                            href === "/"
-                                                ? pathname === "/"
-                                                : pathname.startsWith(
-                                                      href
-                                                  );
+                                {NAV_LINKS.map(({ href, label }, index) => {
+                                    const isActive =
+                                        href === "/"
+                                            ? pathname === "/"
+                                            : pathname.startsWith(href);
 
-                                        return (
-                                            <motion.div
-                                                key={href}
-                                                initial={{
-                                                    opacity: 0,
-                                                    x: -12,
-                                                }}
-                                                animate={{
-                                                    opacity: 1,
-                                                    x: 0,
-                                                }}
-                                                transition={{
-                                                    delay: index * 0.05,
-                                                    duration: 0.25,
-                                                }}
+                                    return (
+                                        <motion.div
+                                            key={href}
+                                            initial={{
+                                                opacity: 0,
+                                                x: -12,
+                                            }}
+                                            animate={{
+                                                opacity: 1,
+                                                x: 0,
+                                            }}
+                                            transition={{
+                                                delay: index * 0.05,
+                                                duration: 0.25,
+                                            }}
+                                        >
+                                            <Link
+                                                href={href}
+                                                aria-current={
+                                                    isActive
+                                                        ? "page"
+                                                        : undefined
+                                                }
+                                                className={cn(
+                                                    "block rounded-lg px-4 py-3 text-sm font-medium",
+                                                    "transition-colors",
+                                                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset",
+                                                    isActive
+                                                        ? "bg-primary/10 text-primary"
+                                                        : "text-muted-foreground hover:bg-primary/5 hover:text-primary",
+                                                )}
                                             >
-                                                <Link
-                                                    href={href}
-                                                    aria-current={
-                                                        isActive
-                                                            ? "page"
-                                                            : undefined
-                                                    }
-                                                    className={cn(
-                                                        "block rounded-lg px-4 py-3 text-sm font-medium",
-                                                        "transition-colors",
-                                                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset",
-                                                        isActive
-                                                            ? "bg-primary/10 text-primary"
-                                                            : "text-muted-foreground hover:bg-primary/5 hover:text-primary"
-                                                    )}
-                                                >
-                                                    {label}
-                                                </Link>
-                                            </motion.div>
-                                        );
-                                    }
-                                )}
+                                                {label}
+                                            </Link>
+                                        </motion.div>
+                                    );
+                                })}
                             </div>
                         </motion.div>
                     )}

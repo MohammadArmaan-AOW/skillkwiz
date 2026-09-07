@@ -5,6 +5,10 @@ import "./globals.css";
 import SiteHeader from "@/components/site-header";
 import SiteFooter from "@/components/site-footer";
 
+import "./globals.css";
+import { ThemeProvider } from "@/contexts/theme-provider";
+import QueryProvider from "@/contexts/query-provider";
+
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
@@ -91,19 +95,20 @@ export default function RootLayout({
     children: React.ReactNode;
 }>) {
     return (
-        <ThemeProvider>
-            <html lang="en">
-                <body className={inter.className}>
-                    <div className="flex min-h-screen flex-col">
-                        <SiteHeader />
-                        <main className="flex-grow">{children}</main>
-                        <SiteFooter />
-                    </div>
-                </body>
-            </html>
-        </ThemeProvider>
+        <html lang="en" suppressHydrationWarning>
+            <body className={inter.className}>
+                <ThemeProvider>
+                    <QueryProvider>
+                        <div className="flex min-h-screen flex-col">
+                            <SiteHeader />
+
+                            <main className="flex-grow">{children}</main>
+
+                            <SiteFooter />
+                        </div>
+                    </QueryProvider>
+                </ThemeProvider>
+            </body>
+        </html>
     );
 }
-
-import "./globals.css";
-import { ThemeProvider } from "@/contexts/theme-provider";
