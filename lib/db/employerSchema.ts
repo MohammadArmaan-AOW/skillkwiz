@@ -9,8 +9,11 @@ export type AuthProvider = "email" | "google";
 export interface IEmployer {
     fullName: string;
     email: string;
+
     passwordHash?: string;
+
     emailVerified: boolean;
+
     googleId?: string;
     authProvider: AuthProvider;
 
@@ -26,11 +29,13 @@ export interface IEmployer {
     resetPasswordExpiresAt?: Date;
 
     phoneNumber?: string;
+
     companyName?: string;
     companyAddress?: string;
     department?: string;
 
-    credits: number;
+    authorizedToPay: boolean;
+    authorizationDetails?: string;
 
     createdAt: Date;
     updatedAt: Date;
@@ -131,10 +136,14 @@ const employerSchema = new Schema<IEmployer>(
             trim: true,
         },
 
-        credits: {
-            type: Number,
-            default: 0,
-            min: 0,
+        authorizedToPay: {
+            type: Boolean,
+            default: false,
+        },
+
+        authorizationDetails: {
+            type: String,
+            trim: true,
         },
     },
     {
