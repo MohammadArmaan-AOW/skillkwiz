@@ -8,6 +8,7 @@ import SiteFooter from "@/components/site-footer";
 import "./globals.css";
 import { ThemeProvider } from "@/contexts/theme-provider";
 import QueryProvider from "@/contexts/query-provider";
+import { Toaster } from "sonner";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -100,6 +101,11 @@ export default function RootLayout({
                 <ThemeProvider>
                     <QueryProvider>
                         <div className="flex min-h-screen flex-col">
+                            <Toaster
+                                richColors
+                                closeButton
+                                position="top-center"
+                            />
                             <SiteHeader />
 
                             <main className="flex-grow">{children}</main>

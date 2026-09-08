@@ -8,4 +8,4 @@ if (!resendApiKey) {
 
 export const resend = new Resend(resendApiKey);
 
-export const EMAIL_FROM = "onboarding@resend.dev";
+export const EMAIL_FROM = "SkillKwiz <no-reply@skillkwiz.co.in>";

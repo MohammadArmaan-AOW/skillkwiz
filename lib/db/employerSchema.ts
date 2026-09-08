@@ -10,13 +10,11 @@ export interface IEmployer {
     fullName: string;
     email: string;
     passwordHash?: string;
-
     emailVerified: boolean;
-
     googleId?: string;
     authProvider: AuthProvider;
 
-    profilePhoto?: string;
+    profilePhoto?: string | null;
 
     emailOtpHash?: string;
     emailOtpExpiresAt?: Date;
@@ -32,8 +30,7 @@ export interface IEmployer {
     companyAddress?: string;
     department?: string;
 
-    authorizedToPay: boolean;
-    authorizationDetails?: string;
+    credits: number;
 
     createdAt: Date;
     updatedAt: Date;
@@ -93,6 +90,7 @@ const employerSchema = new Schema<IEmployer>(
             type: Date,
             select: false,
         },
+
         forgotPasswordToken: {
             type: String,
             select: false,
@@ -133,14 +131,10 @@ const employerSchema = new Schema<IEmployer>(
             trim: true,
         },
 
-        authorizedToPay: {
-            type: Boolean,
-            default: false,
-        },
-
-        authorizationDetails: {
-            type: String,
-            trim: true,
+        credits: {
+            type: Number,
+            default: 0,
+            min: 0,
         },
     },
     {

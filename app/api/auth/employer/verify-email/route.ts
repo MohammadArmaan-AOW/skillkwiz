@@ -9,7 +9,7 @@ import Employer from "@/lib/db/employerSchema";
 import { resend, EMAIL_FROM } from "@/lib/email/resend";
 import { createEmployerJwt } from "@/lib/auth/jwt";
 import { employerWelcomeTemplate } from "@/lib/emailTemplates/employerWelcome";
-
+import { sendEmail } from "@/lib/email/sendEmail";
 
 const verifyEmailSchema = z.object({
     email: z
@@ -129,15 +129,25 @@ export async function POST(request: Request) {
             profileUrl,
         });
 
-        const { error: emailError } = await resend.emails.send({
-            from: EMAIL_FROM,
-            to: employer.email,
-            subject: "Welcome to SkillKwiz",
-            html: emailHtml,
-        });
+        // const { error: emailError } = await resend.emails.send({
+        //     from: EMAIL_FROM,
+        //     to: employer.email,
+        //     subject: "Welcome to SkillKwiz",
+        //     html: emailHtml,
+        // });
 
-        if (emailError) {
-            console.error("Welcome email error:", emailError);
+        // if (emailError) {
+        //     console.error("Welcome email error:", emailError);
+        // }
+
+        try {
+            await sendEmail({
+                to: email,
+                subject: "Welcome email error:",
+                html: emailHtml,
+            });
+        } catch (emailError) {
+            console.error("Gmail email error:", emailError);
         }
 
         // Create response

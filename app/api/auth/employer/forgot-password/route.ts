@@ -8,9 +8,9 @@ import Employer from "@/lib/db/employerSchema";
 
 import { resend, EMAIL_FROM } from "@/lib/email/resend";
 
-
 import { employerForgotPasswordTemplate } from "@/lib/emailTemplates/employerForgotPassword";
 import { hashToken } from "@/lib/auth/jwt";
+import { sendEmail } from "@/lib/email/sendEmail";
 
 const forgotPasswordSchema = z.object({
     email: z
@@ -77,14 +77,23 @@ export async function POST(request: Request) {
             resetUrl,
         });
 
-        const { error: emailError } = await resend.emails.send({
-            from: EMAIL_FROM,
-            to: employer.email,
-            subject: "Reset your SkillKwiz password",
-            html: emailHtml,
-        });
+        // const { error: emailError } = await resend.emails.send({
+        //     from: EMAIL_FROM,
+        //     to: employer.email,
+        //     subject: "Reset your SkillKwiz password",
+        //     html: emailHtml,
+        // });
 
-        if (emailError) {
+        // if (emailError) {
+        //     console.error("Forgot password email error:", emailError);
+
+        try {
+            await sendEmail({
+                to: employer.email,
+                subject: "Reset your SkillKwiz password",
+                html: emailHtml,
+            });
+        } catch (emailError) {
             console.error("Forgot password email error:", emailError);
 
             return NextResponse.json(
