@@ -6,6 +6,7 @@ import { connectDB } from "@/lib/db/db";
 import Employer from "@/lib/db/employerSchema";
 import Payment from "@/lib/db/paymentSchema";
 import { razorpay } from "@/lib/payments/razorpay";
+import { getCreditPrice } from "@/lib/payments/creditPricing";
 
 const JWT_SECRET = process.env.JWT_SECRET!;
 const EMPLOYER_TOKEN_COOKIE = "skillkwiz_employer_token";
@@ -17,18 +18,23 @@ type EmployerTokenPayload = {
 };
 
 const createOrderSchema = z.object({
-    credits: z.number().int().min(1, "At least 1 credit is required."),
+    credits: z
+        .number()
+        .int()
+        .min(1, "At least 1 credit is required."),
 });
 
 export async function POST(request: NextRequest) {
     try {
-        const token = request.cookies.get(EMPLOYER_TOKEN_COOKIE)?.value;
+        const token = request.cookies.get(
+            EMPLOYER_TOKEN_COOKIE,
+        )?.value;
 
         if (!token) {
             return NextResponse.json(
                 {
                     success: false,
-                    message: "Authentication required.",
+                    message: "Unauthorized.",
                 },
                 { status: 401 },
             );
@@ -40,12 +46,12 @@ export async function POST(request: NextRequest) {
             payload = jwt.verify(
                 token,
                 JWT_SECRET,
-            ) as unknown as EmployerTokenPayload;
+            ) as EmployerTokenPayload;
         } catch {
             return NextResponse.json(
                 {
                     success: false,
-                    message: "Invalid or expired session.",
+                    message: "Invalid or expired authentication token.",
                 },
                 { status: 401 },
             );
@@ -55,7 +61,7 @@ export async function POST(request: NextRequest) {
             return NextResponse.json(
                 {
                     success: false,
-                    message: "Invalid employer session.",
+                    message: "Invalid employer authentication.",
                 },
                 { status: 401 },
             );
@@ -69,8 +75,9 @@ export async function POST(request: NextRequest) {
             return NextResponse.json(
                 {
                     success: false,
-                    message: "Invalid payment request.",
-                    errors: parsed.error.flatten().fieldErrors,
+                    message:
+                        parsed.error.issues[0]?.message ??
+                        "Invalid request.",
                 },
                 { status: 400 },
             );
@@ -80,7 +87,9 @@ export async function POST(request: NextRequest) {
 
         await connectDB();
 
-        const employer = await Employer.findById(payload.employerId);
+        const employer = await Employer.findById(
+            payload.employerId,
+        );
 
         if (!employer) {
             return NextResponse.json(
@@ -92,24 +101,16 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        /*
-         * TEMPORARY TEST PRICING
-         *
-         * Replace this with the final SkillKwiz pricing
-         * configuration once the credit price is finalized.
-         *
-         * Example:
-         * 1 credit = ₹10
-         */
-        const pricePerCredit = 10;
+        const amount = getCreditPrice(
+            "razorpay",
+            credits,
+        );
 
-        const amount = credits * pricePerCredit;
+        const amountInPaise = amount * 100;
 
-        const amountInPaise = Math.round(amount * 100);
+        const receipt = `credit_${payload.employerId}_${Date.now()}`;
 
-        const receipt = `skw_${Date.now()}`;
-
-        const razorpayOrder = await razorpay.orders.create({
+        const order = await razorpay.orders.create({
             amount: amountInPaise,
             currency: "INR",
             receipt,
@@ -118,7 +119,7 @@ export async function POST(request: NextRequest) {
         const payment = await Payment.create({
             employerId: employer._id,
             provider: "razorpay",
-            providerOrderId: razorpayOrder.id,
+            providerOrderId: order.id,
             amount,
             currency: "INR",
             status: "created",
@@ -128,23 +129,27 @@ export async function POST(request: NextRequest) {
 
         return NextResponse.json({
             success: true,
-            message: "Razorpay order created successfully.",
+
             order: {
-                id: razorpayOrder.id,
-                amount: razorpayOrder.amount,
-                currency: razorpayOrder.currency,
+                id: order.id,
+                amount: order.amount,
+                currency: order.currency,
             },
+
             payment: {
-                id: payment._id.toString(),
-                credits: payment.creditsPurchased,
-                amount: payment.amount,
-                currency: payment.currency,
-                status: payment.status,
+                id: payment._id,
+                credits,
+                amount,
+                currency: "INR",
             },
-            razorpayKeyId: process.env.RAZORPAY_KEY_ID,
+
+            razorpayKeyId: process.env.RAZORPAY_API_KEY,
         });
     } catch (error) {
-        console.error("Create Razorpay order error:", error);
+        console.error(
+            "Razorpay create order error:",
+            error,
+        );
 
         return NextResponse.json(
             {

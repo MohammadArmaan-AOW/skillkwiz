@@ -1,13 +1,10 @@
-import mongoose, {
-    Schema,
-    type Model,
-    type HydratedDocument,
-} from "mongoose";
+import mongoose, { Schema, type Model, type HydratedDocument } from "mongoose";
 
 export type AuthProvider = "email" | "google";
 
 export interface IEmployer {
     fullName: string;
+
     email: string;
 
     passwordHash?: string;
@@ -15,29 +12,68 @@ export interface IEmployer {
     emailVerified: boolean;
 
     googleId?: string;
+
     authProvider: AuthProvider;
 
     profilePhoto?: string | null;
 
     emailOtpHash?: string;
+
     emailOtpExpiresAt?: Date;
 
     forgotPasswordToken?: string;
+
     forgotPasswordExpiresAt?: Date;
 
     resetPasswordToken?: string;
+
     resetPasswordExpiresAt?: Date;
 
     phoneNumber?: string;
 
     companyName?: string;
+
     companyAddress?: string;
+
     department?: string;
 
+    /**
+     * Legacy/general payment authorization flag.
+     *
+     * Keep this for backward compatibility with existing
+     * employer/payment authorization logic.
+     */
     authorizedToPay: boolean;
+
+    /**
+     * Legacy/general authorization information.
+     *
+     * Keep this so existing code does not break.
+     */
     authorizationDetails?: string;
 
+    /**
+     * Provider-specific payment authorization.
+     *
+     * This is the new source used by the unified payment-method
+     * API and frontend payment-method flow.
+     */
+    paymentMethods?: {
+        razorpay?: {
+            authorized: boolean;
+            authorizedAt?: Date;
+        };
+
+        paypal?: {
+            authorized: boolean;
+            authorizedAt?: Date;
+        };
+    };
+
+    credits: number;
+
     createdAt: Date;
+
     updatedAt: Date;
 }
 
@@ -136,16 +172,55 @@ const employerSchema = new Schema<IEmployer>(
             trim: true,
         },
 
+        /**
+         * Legacy/general payment authorization.
+         */
         authorizedToPay: {
             type: Boolean,
             default: false,
         },
 
+        /**
+         * Legacy/general authorization information.
+         */
         authorizationDetails: {
             type: String,
             trim: true,
         },
+
+        /**
+         * Provider-specific payment authorization.
+         */
+        paymentMethods: {
+            razorpay: {
+                authorized: {
+                    type: Boolean,
+                    default: false,
+                },
+
+                authorizedAt: {
+                    type: Date,
+                },
+            },
+
+            paypal: {
+                authorized: {
+                    type: Boolean,
+                    default: false,
+                },
+
+                authorizedAt: {
+                    type: Date,
+                },
+            },
+        },
+        credits: {
+            type: Number,
+            default: 0,
+            min: 0,
+        },
     },
+
     {
         timestamps: true,
     },

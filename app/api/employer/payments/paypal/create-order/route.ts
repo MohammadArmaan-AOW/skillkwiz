@@ -1,10 +1,15 @@
+// Paypal - Create Order
+
 import { NextRequest, NextResponse } from "next/server";
+
 import jwt from "jsonwebtoken";
 import { z } from "zod";
 
 import { connectDB } from "@/lib/db/db";
+
 import Employer from "@/lib/db/employerSchema";
 import Payment from "@/lib/db/paymentSchema";
+
 import { getPayPalAccessToken, PAYPAL_BASE_URL } from "@/lib/payments/paypal";
 
 const JWT_SECRET = process.env.JWT_SECRET!;
@@ -22,6 +27,10 @@ const createOrderSchema = z.object({
 
 export async function POST(request: NextRequest) {
     try {
+        // ------------------------------------------------------------------
+        // Authentication
+        // ------------------------------------------------------------------
+
         const token = request.cookies.get(EMPLOYER_TOKEN_COOKIE)?.value;
 
         if (!token) {
@@ -61,6 +70,10 @@ export async function POST(request: NextRequest) {
             );
         }
 
+        // ------------------------------------------------------------------
+        // Validate request
+        // ------------------------------------------------------------------
+
         const body = await request.json();
 
         const parsed = createOrderSchema.safeParse(body);
@@ -78,6 +91,10 @@ export async function POST(request: NextRequest) {
 
         const { credits } = parsed.data;
 
+        // ------------------------------------------------------------------
+        // Database
+        // ------------------------------------------------------------------
+
         await connectDB();
 
         const employer = await Employer.findById(payload.employerId);
@@ -92,29 +109,42 @@ export async function POST(request: NextRequest) {
             );
         }
 
+        // ------------------------------------------------------------------
+        // Pricing
+        // ------------------------------------------------------------------
+
         /*
          * TEMPORARY TEST PRICING
          *
          * Replace with the final SkillKwiz
          * credit pricing configuration.
          */
-        const pricePerCredit = 10;
+        const pricePerCredit = 1;
 
         const amount = credits * pricePerCredit;
-
         const formattedAmount = amount.toFixed(2);
 
+        // ------------------------------------------------------------------
+        // PayPal authentication
+        // ------------------------------------------------------------------
+
         const accessToken = await getPayPalAccessToken();
+
+        // ------------------------------------------------------------------
+        // Create PayPal order
+        // ------------------------------------------------------------------
 
         const paypalResponse = await fetch(
             `${PAYPAL_BASE_URL}/v2/checkout/orders`,
             {
                 method: "POST",
+
                 headers: {
                     Authorization: `Bearer ${accessToken}`,
                     "Content-Type": "application/json",
                     "PayPal-Request-Id": `skw-${payload.employerId}-${Date.now()}`,
                 },
+
                 body: JSON.stringify({
                     intent: "CAPTURE",
 
@@ -130,14 +160,59 @@ export async function POST(request: NextRequest) {
                             },
                         },
                     ],
+
+                    application_context: {
+                        brand_name: "SkillKwiz",
+                        user_action: "PAY_NOW",
+
+                        return_url: `${request.nextUrl.origin}/services/employer/profile`,
+
+                        cancel_url: `${request.nextUrl.origin}/services/employer/profile`,
+                    },
                 }),
+
                 cache: "no-store",
             },
         );
 
-        const paypalData = await paypalResponse.json();
+        // ------------------------------------------------------------------
+        // Parse PayPal response safely
+        // ------------------------------------------------------------------
 
-        if (!paypalResponse.ok) {
+        const responseText = await paypalResponse.text();
+
+        let paypalData: {
+            id?: string;
+            status?: string;
+            links?: {
+                href?: string;
+                rel?: string;
+                method?: string;
+            }[];
+        };
+
+        try {
+            paypalData = JSON.parse(responseText);
+        } catch {
+            console.error(
+                "PayPal create order returned invalid JSON:",
+                responseText,
+            );
+
+            return NextResponse.json(
+                {
+                    success: false,
+                    message: "Invalid response received from PayPal.",
+                },
+                { status: 502 },
+            );
+        }
+
+        // ------------------------------------------------------------------
+        // Handle PayPal error
+        // ------------------------------------------------------------------
+
+        if (!paypalResponse.ok || !paypalData.id) {
             console.error("PayPal create order error:", paypalData);
 
             return NextResponse.json(
@@ -148,6 +223,39 @@ export async function POST(request: NextRequest) {
                 { status: 502 },
             );
         }
+
+        // ------------------------------------------------------------------
+        // Find PayPal approval URL
+        // ------------------------------------------------------------------
+
+        const approvalLink = paypalData.links?.find(
+            (link) => link.rel === "approve" || link.rel === "payer-action",
+        );
+
+        const approvalUrl = approvalLink?.href ?? null;
+
+        console.log("PayPal order created:", paypalData.id);
+
+        console.log("PayPal approval URL:", approvalUrl);
+
+        if (!approvalUrl) {
+            console.error(
+                "PayPal order did not contain an approval link:",
+                paypalData,
+            );
+
+            return NextResponse.json(
+                {
+                    success: false,
+                    message: "PayPal approval URL was not returned.",
+                },
+                { status: 502 },
+            );
+        }
+
+        // ------------------------------------------------------------------
+        // Create local payment record
+        // ------------------------------------------------------------------
 
         const payment = await Payment.create({
             employerId: employer._id,
@@ -167,9 +275,9 @@ export async function POST(request: NextRequest) {
             creditsPurchased: credits,
         });
 
-        const approvalLink = paypalData.links?.find(
-            (link: { href: string; rel: string }) => link.rel === "approve",
-        );
+        // ------------------------------------------------------------------
+        // Response
+        // ------------------------------------------------------------------
 
         return NextResponse.json({
             success: true,
@@ -178,19 +286,30 @@ export async function POST(request: NextRequest) {
 
             order: {
                 id: paypalData.id,
-                status: paypalData.status,
+
+                status: paypalData.status ?? "CREATED",
+
                 amount,
+
                 currency: "USD",
-                approvalUrl: approvalLink?.href ?? null,
             },
 
             payment: {
                 id: payment._id.toString(),
+
                 credits: payment.creditsPurchased,
+
                 amount: payment.amount,
+
                 currency: payment.currency,
+
                 status: payment.status,
             },
+
+            // IMPORTANT:
+            // approvalUrl must be at the top level because
+            // PaymentDetails uses response.approvalUrl.
+            approvalUrl,
         });
     } catch (error) {
         console.error("Create PayPal order error:", error);

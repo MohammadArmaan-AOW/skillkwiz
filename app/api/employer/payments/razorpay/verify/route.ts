@@ -5,9 +5,10 @@ import { z } from "zod";
 
 import { connectDB } from "@/lib/db/db";
 import Payment from "@/lib/db/paymentSchema";
+import Employer from "@/lib/db/employerSchema";
 
 const JWT_SECRET = process.env.JWT_SECRET!;
-const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET!;
+const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_SECRET_KEY!;
 
 const EMPLOYER_TOKEN_COOKIE = "skillkwiz_employer_token";
 
@@ -31,7 +32,7 @@ export async function POST(request: NextRequest) {
             return NextResponse.json(
                 {
                     success: false,
-                    message: "Authentication required.",
+                    message: "Unauthorized.",
                 },
                 { status: 401 },
             );
@@ -40,15 +41,12 @@ export async function POST(request: NextRequest) {
         let payload: EmployerTokenPayload;
 
         try {
-            payload = jwt.verify(
-                token,
-                JWT_SECRET,
-            ) as unknown as EmployerTokenPayload;
+            payload = jwt.verify(token, JWT_SECRET) as EmployerTokenPayload;
         } catch {
             return NextResponse.json(
                 {
                     success: false,
-                    message: "Invalid or expired session.",
+                    message: "Invalid or expired authentication token.",
                 },
                 { status: 401 },
             );
@@ -58,7 +56,7 @@ export async function POST(request: NextRequest) {
             return NextResponse.json(
                 {
                     success: false,
-                    message: "Invalid employer session.",
+                    message: "Invalid employer authentication.",
                 },
                 { status: 401 },
             );
@@ -73,7 +71,6 @@ export async function POST(request: NextRequest) {
                 {
                     success: false,
                     message: "Invalid payment verification data.",
-                    errors: parsed.error.flatten().fieldErrors,
                 },
                 { status: 400 },
             );
@@ -104,11 +101,7 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({
                 success: true,
                 message: "Payment already verified.",
-                payment: {
-                    id: payment._id.toString(),
-                    status: payment.status,
-                    creditsPurchased: payment.creditsPurchased,
-                },
+                payment,
             });
         }
 
@@ -117,9 +110,12 @@ export async function POST(request: NextRequest) {
             .update(`${razorpayOrderId}|${razorpayPaymentId}`)
             .digest("hex");
 
-        const signaturesMatch = generatedSignature === razorpaySignature;
+        const isValidSignature = crypto.timingSafeEqual(
+            Buffer.from(generatedSignature),
+            Buffer.from(razorpaySignature),
+        );
 
-        if (!signaturesMatch) {
+        if (!isValidSignature) {
             payment.status = "failed";
             payment.providerPaymentId = razorpayPaymentId;
 
@@ -128,7 +124,7 @@ export async function POST(request: NextRequest) {
             return NextResponse.json(
                 {
                     success: false,
-                    message: "Invalid payment signature.",
+                    message: "Invalid Razorpay payment signature.",
                 },
                 { status: 400 },
             );
@@ -139,26 +135,79 @@ export async function POST(request: NextRequest) {
         payment.status = "paid";
         payment.paidAt = new Date();
 
+        if (!payment.creditsGranted) {
+            console.log("========== CREDIT GRANT START ==========");
+
+            console.log("Employer ID:", payload.employerId);
+            console.log("Credits to add:", payment.creditsPurchased);
+
+            const employerBefore = await Employer.findById(
+                payload.employerId,
+            ).lean();
+
+            console.log("Employer BEFORE credit update:", employerBefore);
+
+            if (!employerBefore) {
+                console.error("Employer NOT FOUND:", payload.employerId);
+
+                return NextResponse.json(
+                    {
+                        success: false,
+                        message: "Employer not found.",
+                    },
+                    { status: 404 },
+                );
+            }
+
+            const updatedEmployer = await Employer.findByIdAndUpdate(
+                payload.employerId,
+                {
+                    $inc: {
+                        credits: payment.creditsPurchased,
+                    },
+                },
+                {
+                    new: true,
+                },
+            );
+
+            console.log("Employer AFTER credit update:", updatedEmployer);
+
+            if (!updatedEmployer) {
+                console.error(
+                    "Employer update returned null:",
+                    payload.employerId,
+                );
+
+                return NextResponse.json(
+                    {
+                        success: false,
+                        message: "Unable to update employer credits.",
+                    },
+                    { status: 500 },
+                );
+            }
+
+            payment.creditsGranted = true;
+
+            console.log("========== CREDIT GRANT COMPLETE ==========");
+        }
+
         await payment.save();
 
         return NextResponse.json({
             success: true,
             message: "Payment verified successfully.",
-            payment: {
-                id: payment._id.toString(),
-                status: payment.status,
-                creditsPurchased: payment.creditsPurchased,
-                amount: payment.amount,
-                currency: payment.currency,
-            },
+            payment,
+            creditsPurchased: payment.creditsPurchased,
         });
     } catch (error) {
-        console.error("Verify Razorpay payment error:", error);
+        console.error("Razorpay verification error:", error);
 
         return NextResponse.json(
             {
                 success: false,
-                message: "Failed to verify payment.",
+                message: "Failed to verify Razorpay payment.",
             },
             { status: 500 },
         );

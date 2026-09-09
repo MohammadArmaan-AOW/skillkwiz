@@ -7,10 +7,13 @@ export const PAYPAL_BASE_URL =
         : "https://api-m.sandbox.paypal.com";
 
 let cachedAccessToken: string | null = null;
+
 let accessTokenExpiresAt = 0;
 
 export async function getPayPalAccessToken(): Promise<string> {
-    const PAYPAL_CLIENT_ID = process.env.PAYPAL_CLIENT_ID;
+    const PAYPAL_CLIENT_ID =
+        process.env.PAYPAL_CLIENT_ID;
+
     const PAYPAL_CLIENT_SECRET =
         process.env.PAYPAL_CLIENT_SECRET;
 
@@ -43,22 +46,37 @@ export async function getPayPalAccessToken(): Promise<string> {
         `${PAYPAL_BASE_URL}/v1/oauth2/token`,
         {
             method: "POST",
+
             headers: {
-                Authorization: `Basic ${credentials}`,
+                Authorization:
+                    `Basic ${credentials}`,
+
                 "Content-Type":
                     "application/x-www-form-urlencoded",
+
+                Accept:
+                    "application/json",
             },
-            body: "grant_type=client_credentials",
+
+            body:
+                "grant_type=client_credentials",
+
             cache: "no-store",
         },
     );
 
-    if (!response.ok) {
-        const errorText = await response.text();
+    const responseText =
+        await response.text();
 
+    if (!response.ok) {
         console.error(
             "PayPal access token error:",
-            errorText,
+            {
+                status: response.status,
+                statusText:
+                    response.statusText,
+                body: responseText,
+            },
         );
 
         throw new Error(
@@ -66,12 +84,35 @@ export async function getPayPalAccessToken(): Promise<string> {
         );
     }
 
-    const data = (await response.json()) as {
+    let data: {
         access_token: string;
         expires_in: number;
     };
 
-    cachedAccessToken = data.access_token;
+    try {
+        data = JSON.parse(responseText);
+    } catch {
+        console.error(
+            "PayPal access token returned invalid JSON:",
+            responseText,
+        );
+
+        throw new Error(
+            "Invalid response from PayPal.",
+        );
+    }
+
+    if (
+        !data.access_token ||
+        !data.expires_in
+    ) {
+        throw new Error(
+            "Invalid PayPal access token response.",
+        );
+    }
+
+    cachedAccessToken =
+        data.access_token;
 
     accessTokenExpiresAt =
         now + data.expires_in * 1000;

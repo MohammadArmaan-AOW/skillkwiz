@@ -27,7 +27,8 @@ import InfoRow from "@/app/services/employer/profile/_components/InfoRow";
 import AssessmentAuthorization from "@/app/services/employer/profile/_components/AssessmentAuthorization";
 import PaymentDetails from "@/app/services/employer/profile/_components/PaymentDetails";
 import { useRazorpay } from "@/hooks/queries/employer/payments/useRazorpay";
-import { usePaypal } from "@/hooks/queries/employer/usePaypal";
+import { usePaypal } from "@/hooks/queries/employer/payments/usePaypal";
+import EmployerLogoutButton from "./EmployerLogoutButton";
 
 export default function EmployerProfile() {
     const {
@@ -48,12 +49,6 @@ export default function EmployerProfile() {
         updatePasswordSuccess,
         resetUpdatePassword,
     } = useEmployerProfile();
-
-    const { isAuthorized: isRazorpayAuthorized } = useRazorpay();
-
-    const { isAuthorized: isPaypalAuthorized } = usePaypal();
-
-    const isAuthorized = isRazorpayAuthorized || isPaypalAuthorized;
 
     const [isEditing, setIsEditing] = useState(false);
 
@@ -615,7 +610,7 @@ export default function EmployerProfile() {
                     {/* Assessment Authorization                                  */}
                     {/* -------------------------------------------------------- */}
 
-                    <AssessmentAuthorization isAuthorized={isAuthorized} />
+                    <AssessmentAuthorization />
 
                     {/* -------------------------------------------------------- */}
                     {/* Payment Details Placeholder                               */}
@@ -757,6 +752,28 @@ export default function EmployerProfile() {
                                 </div>
                             </form>
                         )}
+                    </section>
+
+                    {/* -------------------------------------------------------- */}
+                    {/* Account                                                   */}
+                    {/* -------------------------------------------------------- */}
+
+                    <section className="rounded-xl border border-border bg-muted/20 p-4">
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                            <div>
+                                <p className="text-sm font-medium">Account</p>
+
+                                <p className="mt-1 text-xs text-muted-foreground">
+                                    Sign out of your employer account on this
+                                    device.
+                                </p>
+                            </div>
+
+                            <EmployerLogoutButton
+                                variant="small"
+                                color="destructive"
+                            />
+                        </div>
                     </section>
                 </>
             )}

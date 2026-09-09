@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import axios from "axios";
 
@@ -8,49 +8,28 @@ import axios from "axios";
 /*                                   Types                                    */
 /* -------------------------------------------------------------------------- */
 
-export type PayPalPaymentMethod = {
-    id: string;
-    provider: "paypal";
-    type: "paypal" | "card";
-    status: "active" | "inactive" | "failed" | "expired";
-    verified: boolean;
-    card?: {
-        brand?: string;
-        last4?: string;
-        expiryMonth?: number;
-        expiryYear?: number;
-        cardholderName?: string;
-    } | null;
-};
-
-export type PayPalPaymentMethodResponse = {
-    success: boolean;
-    authorized: boolean;
-    paymentMethod: PayPalPaymentMethod | null;
-    message?: string;
-};
-
 export type CreatePayPalOrderData = {
     credits: number;
 };
 
 export type CreatePayPalOrderResponse = {
     success: boolean;
-    message: string;
+    message?: string;
+
     order: {
         id: string;
         status: string;
-        amount: number;
-        currency: string;
-        approvalUrl: string | null;
     };
+
     payment: {
         id: string;
         credits: number;
         amount: number;
         currency: string;
-        status: string;
+        status?: string;
     };
+
+    approvalUrl: string | null;
 };
 
 export type CapturePayPalOrderData = {
@@ -60,6 +39,7 @@ export type CapturePayPalOrderData = {
 export type CapturePayPalOrderResponse = {
     success: boolean;
     message: string;
+
     payment: {
         id: string;
         provider: "paypal";
@@ -86,17 +66,6 @@ export type ApiError = {
 /* -------------------------------------------------------------------------- */
 /*                              API Functions                                 */
 /* -------------------------------------------------------------------------- */
-
-async function fetchPayPalPaymentMethod(): Promise<PayPalPaymentMethodResponse> {
-    const response = await axios.get<PayPalPaymentMethodResponse>(
-        "/api/employer/payments/paypal/payment-method",
-        {
-            withCredentials: true,
-        },
-    );
-
-    return response.data;
-}
 
 async function createPayPalOrder(
     data: CreatePayPalOrderData,
@@ -152,24 +121,6 @@ function getApiError(error: unknown): ApiError {
 export function usePaypal() {
     const queryClient = useQueryClient();
 
-    /* ------------------------- Payment Method Query ----------------------- */
-
-    const paymentMethodQuery = useQuery<PayPalPaymentMethodResponse, ApiError>({
-        queryKey: ["employer", "payments", "paypal", "payment-method"],
-
-        queryFn: async () => {
-            try {
-                return await fetchPayPalPaymentMethod();
-            } catch (error) {
-                throw getApiError(error);
-            }
-        },
-
-        retry: false,
-        refetchOnWindowFocus: false,
-        staleTime: 5 * 60 * 1000,
-    });
-
     /* -------------------------- Create Order ------------------------------ */
 
     const createOrderMutation = useMutation<
@@ -202,10 +153,19 @@ export function usePaypal() {
         },
 
         onSuccess: async () => {
+            /*
+             * PayPal capture may update the employer's
+             * payment-method authorization on the backend.
+             *
+             * Refresh the unified payment-method query.
+             */
             await queryClient.invalidateQueries({
-                queryKey: ["employer", "payments", "paypal", "payment-method"],
+                queryKey: ["employer", "payments", "payment-method"],
             });
 
+            /*
+             * Keep existing broader invalidations.
+             */
             await queryClient.invalidateQueries({
                 queryKey: ["employer", "payments"],
             });
@@ -217,6 +177,10 @@ export function usePaypal() {
             await queryClient.invalidateQueries({
                 queryKey: ["employer", "profile"],
             });
+
+            await queryClient.invalidateQueries({
+        queryKey: ["employer", "assessment", "authorization"],
+    });
         },
     });
 
@@ -225,24 +189,8 @@ export function usePaypal() {
     /* ---------------------------------------------------------------------- */
 
     return {
-        /* Payment method */
-        paymentMethod: paymentMethodQuery.data?.paymentMethod ?? null,
+        /* -------------------------- Create order -------------------------- */
 
-        isAuthorized: paymentMethodQuery.data?.authorized ?? false,
-
-        paymentMethodResponse: paymentMethodQuery.data,
-
-        isLoadingPaymentMethod: paymentMethodQuery.isPending,
-
-        isFetchingPaymentMethod: paymentMethodQuery.isFetching,
-
-        isPaymentMethodError: paymentMethodQuery.isError,
-
-        paymentMethodError: paymentMethodQuery.error,
-
-        refetchPaymentMethod: paymentMethodQuery.refetch,
-
-        /* Create order */
         createOrder: createOrderMutation.mutateAsync,
 
         isCreatingOrder: createOrderMutation.isPending,
@@ -255,7 +203,8 @@ export function usePaypal() {
 
         resetCreateOrder: createOrderMutation.reset,
 
-        /* Capture order */
+        /* -------------------------- Capture order ------------------------- */
+
         captureOrder: captureOrderMutation.mutateAsync,
 
         isCapturingOrder: captureOrderMutation.isPending,

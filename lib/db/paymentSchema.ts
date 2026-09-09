@@ -34,6 +34,8 @@ export interface IPayment {
 
     creditsPurchased: number;
 
+    creditsGranted: boolean;
+
     metadata?: Record<string, unknown>;
 
     paidAt?: Date;
@@ -114,6 +116,11 @@ const paymentSchema = new Schema<IPayment>(
             type: Number,
             required: true,
             min: 1,
+        },
+
+        creditsGranted: {
+            type: Boolean,
+            default: false,
         },
 
         metadata: {

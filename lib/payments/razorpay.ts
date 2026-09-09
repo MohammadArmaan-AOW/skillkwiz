@@ -1,18 +1,18 @@
 import Razorpay from "razorpay";
 
 function createRazorpay(): Razorpay {
-    const keyId = process.env.RAZORPAY_KEY_ID;
-    const keySecret = process.env.RAZORPAY_KEY_SECRET;
+    const keyId = process.env.RAZORPAY_API_KEY;
+    const keySecret = process.env.RAZORPAY_SECRET_KEY;
 
     if (!keyId) {
         throw new Error(
-            "RAZORPAY_KEY_ID is not configured.",
+            "RAZORPAY_API_KEY is not configured.",
         );
     }
 
     if (!keySecret) {
         throw new Error(
-            "RAZORPAY_KEY_SECRET is not configured.",
+            "RAZORPAY_SECRET_KEY is not configured.",
         );
     }
 

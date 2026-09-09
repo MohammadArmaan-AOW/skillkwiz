@@ -1,34 +1,12 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import axios from "axios";
 
 /* -------------------------------------------------------------------------- */
 /*                                   Types                                    */
 /* -------------------------------------------------------------------------- */
-
-export type RazorpayPaymentMethod = {
-    id: string;
-    provider: "razorpay";
-    type: "card";
-    status: "active" | "inactive" | "failed" | "expired";
-    verified: boolean;
-    card?: {
-        brand?: string;
-        last4?: string;
-        expiryMonth?: number;
-        expiryYear?: number;
-        cardholderName?: string;
-    } | null;
-};
-
-export type RazorpayPaymentMethodResponse = {
-    success: boolean;
-    authorized: boolean;
-    paymentMethod: RazorpayPaymentMethod | null;
-    message?: string;
-};
 
 export type CreateRazorpayOrderData = {
     credits: number;
@@ -42,15 +20,22 @@ export type RazorpayOrder = {
 
 export type CreateRazorpayOrderResponse = {
     success: boolean;
-    message: string;
-    order: RazorpayOrder;
+    message?: string;
+
+    order: {
+        id: string;
+        amount: number;
+        currency: string;
+    };
+
     payment: {
         id: string;
         credits: number;
         amount: number;
         currency: string;
-        status: string;
+        status?: string;
     };
+
     razorpayKeyId: string;
 };
 
@@ -63,6 +48,7 @@ export type VerifyRazorpayPaymentData = {
 export type VerifyRazorpayPaymentResponse = {
     success: boolean;
     message: string;
+
     payment: {
         id: string;
         status: string;
@@ -86,17 +72,6 @@ export type ApiError = {
 /* -------------------------------------------------------------------------- */
 /*                              API Functions                                 */
 /* -------------------------------------------------------------------------- */
-
-async function fetchRazorpayPaymentMethod(): Promise<RazorpayPaymentMethodResponse> {
-    const response = await axios.get<RazorpayPaymentMethodResponse>(
-        "/api/employer/payments/razorpay/payment-method",
-        {
-            withCredentials: true,
-        },
-    );
-
-    return response.data;
-}
 
 async function createRazorpayOrder(
     data: CreateRazorpayOrderData,
@@ -152,27 +127,6 @@ function getApiError(error: unknown): ApiError {
 export function useRazorpay() {
     const queryClient = useQueryClient();
 
-    /* ------------------------- Payment Method Query ----------------------- */
-
-    const paymentMethodQuery = useQuery<
-        RazorpayPaymentMethodResponse,
-        ApiError
-    >({
-        queryKey: ["employer", "payments", "razorpay", "payment-method"],
-
-        queryFn: async () => {
-            try {
-                return await fetchRazorpayPaymentMethod();
-            } catch (error) {
-                throw getApiError(error);
-            }
-        },
-
-        retry: false,
-        refetchOnWindowFocus: false,
-        staleTime: 5 * 60 * 1000,
-    });
-
     /* -------------------------- Create Order ------------------------------ */
 
     const createOrderMutation = useMutation<
@@ -205,15 +159,24 @@ export function useRazorpay() {
         },
 
         onSuccess: async () => {
+            /*
+             * Razorpay verification may update the employer's
+             * payment-method authorization on the backend.
+             *
+             * Therefore refresh the unified payment-method query.
+             */
             await queryClient.invalidateQueries({
                 queryKey: [
                     "employer",
                     "payments",
-                    "razorpay",
                     "payment-method",
                 ],
             });
 
+            /*
+             * Keep existing broader payment/profile invalidations
+             * so existing UI continues to update correctly.
+             */
             await queryClient.invalidateQueries({
                 queryKey: ["employer", "payments"],
             });
@@ -233,24 +196,8 @@ export function useRazorpay() {
     /* ---------------------------------------------------------------------- */
 
     return {
-        /* Payment method */
-        paymentMethod: paymentMethodQuery.data?.paymentMethod ?? null,
+        /* -------------------------- Create order -------------------------- */
 
-        isAuthorized: paymentMethodQuery.data?.authorized ?? false,
-
-        paymentMethodResponse: paymentMethodQuery.data,
-
-        isLoadingPaymentMethod: paymentMethodQuery.isPending,
-
-        isFetchingPaymentMethod: paymentMethodQuery.isFetching,
-
-        isPaymentMethodError: paymentMethodQuery.isError,
-
-        paymentMethodError: paymentMethodQuery.error,
-
-        refetchPaymentMethod: paymentMethodQuery.refetch,
-
-        /* Create order */
         createOrder: createOrderMutation.mutateAsync,
 
         isCreatingOrder: createOrderMutation.isPending,
@@ -263,7 +210,8 @@ export function useRazorpay() {
 
         resetCreateOrder: createOrderMutation.reset,
 
-        /* Verify payment */
+        /* -------------------------- Verify payment ------------------------ */
+
         verifyPayment: verifyPaymentMutation.mutateAsync,
 
         isVerifyingPayment: verifyPaymentMutation.isPending,
