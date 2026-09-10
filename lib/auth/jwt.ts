@@ -53,3 +53,13 @@ function isEmployerJwtPayload(
         payload.role === "employer"
     );
 }
+
+export function createEmployeeJwt(payload: {
+    employeeId: string;
+    email: string;
+    role: "employee";
+}) {
+    return jwt.sign(payload, process.env.JWT_SECRET!, {
+        expiresIn: "7d",
+    });
+}

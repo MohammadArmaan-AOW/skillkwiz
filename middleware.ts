@@ -19,21 +19,27 @@ function isPathInsideRoute(pathname: string, route: string) {
 export function middleware(request: NextRequest) {
     const { pathname } = request.nextUrl;
 
-    const employerToken = request.cookies.get(EMPLOYER_TOKEN_COOKIE)?.value;
+    const employerToken =
+        request.cookies.get(EMPLOYER_TOKEN_COOKIE)?.value;
 
-    const employeeToken = request.cookies.get(EMPLOYEE_TOKEN_COOKIE)?.value;
+    const employeeToken =
+        request.cookies.get(EMPLOYEE_TOKEN_COOKIE)?.value;
 
     /*
      * --------------------------------------------------
      * Employer protection
      * --------------------------------------------------
      *
-     * If an employer is logged in, they cannot access
-     * employee service routes.
+     * If an employer is logged in and there is no
+     * employee session, prevent access to employee routes.
      */
+
     if (
         employerToken &&
-        EMPLOYEE_ROUTES.some((route) => isPathInsideRoute(pathname, route))
+        !employeeToken &&
+        EMPLOYEE_ROUTES.some((route) =>
+            isPathInsideRoute(pathname, route),
+        )
     ) {
         return NextResponse.redirect(
             new URL("/services/employer/profile", request.url),
@@ -45,15 +51,18 @@ export function middleware(request: NextRequest) {
      * Employee authentication-route protection
      * --------------------------------------------------
      *
-     * If an employee is already logged in, don't allow
-     * them to visit signup/login/forgot/reset pages.
+     * If an employee is logged in, don't allow them to
+     * visit signup/login/forgot/reset pages.
      */
+
     if (
         employeeToken &&
-        EMPLOYEE_AUTH_ROUTES.some((route) => isPathInsideRoute(pathname, route))
+        EMPLOYEE_AUTH_ROUTES.some((route) =>
+            isPathInsideRoute(pathname, route),
+        )
     ) {
         return NextResponse.redirect(
-            new URL("/services/employee", request.url),
+            new URL("/services/employee/profile", request.url),
         );
     }
 
