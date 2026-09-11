@@ -28,8 +28,8 @@ const employerNavigation = [
         requiresAuthorization: false,
     },
     {
-        href: "/services/employer/assessments/new",
-        label: "New assessment",
+        href: "/services/employer/assessments",
+        label: "Assessments",
         icon: ClipboardCheck,
         requiresAuthorization: true,
     },

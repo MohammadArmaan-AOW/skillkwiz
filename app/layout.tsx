@@ -2,13 +2,12 @@ import type React from "react";
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import SiteHeader from "@/components/site-header";
-import SiteFooter from "@/components/site-footer";
 
 import "./globals.css";
 import { ThemeProvider } from "@/contexts/theme-provider";
 import QueryProvider from "@/contexts/query-provider";
 import { Toaster } from "sonner";
+import SiteChrome from "@/components/site-chrome";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -106,11 +105,13 @@ export default function RootLayout({
                                 closeButton
                                 position="top-center"
                             />
-                            <SiteHeader />
+
+                            <SiteChrome>
 
                             <main className="flex-grow">{children}</main>
+                            </SiteChrome>
 
-                            <SiteFooter />
+
                         </div>
                     </QueryProvider>
                 </ThemeProvider>

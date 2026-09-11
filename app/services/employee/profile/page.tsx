@@ -3,7 +3,6 @@
 import EmployeeProfile from "../_components/EmployeeProfile";
 import { EmployeeWorkflow } from "../_components/EmployeeWorkflow";
 
-
 export default function EmployeeProfilePage() {
     return (
         <EmployeeWorkflow

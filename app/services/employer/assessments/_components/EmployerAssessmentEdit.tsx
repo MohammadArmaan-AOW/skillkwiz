@@ -2,6 +2,7 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import {
+    AlertCircle,
     CheckCircle2,
     ChevronDown,
     ChevronUp,
@@ -10,24 +11,26 @@ import {
     FileText,
     ListChecks,
     Plus,
-    Send,
+    Save,
     ShieldCheck,
     Trash2,
     UserRound,
     X,
 } from "lucide-react";
+import Link from "next/link";
+import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { useState, type FormEvent } from "react";
 
 import { Button } from "@/components/ui/button";
 import { useAssessment } from "@/hooks/queries/useAssessment";
-import { Employee, useEmployeeList } from "@/hooks/queries/useEmployeeAuth";
 
 /*
  * ============================================================
  * TYPES
  * ============================================================
  */
+
+type AssessmentStatus = "draft" | "published" | "closed" | "archived";
 
 type QuestionType =
     | "short-text"
@@ -46,6 +49,7 @@ interface OptionState {
 
 interface QuestionState {
     questionId: string;
+    order: number;
     question: string;
     type: QuestionType;
     points: number;
@@ -66,6 +70,72 @@ interface QuestionState {
 
     autoEvaluate?: boolean;
     explanation?: string;
+}
+
+interface AssignedEmployee {
+    employeeId:
+        | string
+        | {
+              _id?: string;
+              employeeId?: string;
+              fullName?: string;
+              email?: string;
+          };
+
+    assignedAt: string;
+
+    emailSentAt?: string;
+
+    status: "assigned" | "in-progress" | "completed" | "expired";
+
+    startedAt?: string;
+    submittedAt?: string;
+}
+
+interface Assessment {
+    _id: string;
+    title: string;
+    description?: string;
+    instructions?: string;
+
+    skills: string[];
+
+    timing: {
+        startAt: string;
+        endAt: string;
+        durationMinutes: number;
+    };
+
+    timer: {
+        enabled: boolean;
+        autoSubmitOnExpiry: boolean;
+    };
+
+    security: {
+        trackTabChanges: boolean;
+        maxTabChanges?: number;
+    };
+
+    questions: QuestionState[];
+
+    assignedEmployees: AssignedEmployee[];
+
+    totalPoints: number;
+
+    resultSettings: {
+        showResultToEmployee: boolean;
+        showCorrectAnswersToEmployee: boolean;
+    };
+
+    status: AssessmentStatus;
+
+    createdAt: string;
+    updatedAt: string;
+}
+
+interface EmployerAssessmentResponse {
+    success: boolean;
+    assessment: Assessment;
 }
 
 /*
@@ -111,6 +181,7 @@ const defaultSkills = [
 const createQuestion = (type: QuestionType = "short-text"): QuestionState => {
     const base: QuestionState = {
         questionId: crypto.randomUUID(),
+        order: 1,
         question: "",
         type,
         points: 10,
@@ -154,90 +225,200 @@ const createQuestion = (type: QuestionType = "short-text"): QuestionState => {
 
 /*
  * ============================================================
+ * NORMALIZERS
+ * ============================================================
+ */
+
+function toDateTimeLocal(value?: string) {
+    if (!value) {
+        return "";
+    }
+
+    const date = new Date(value);
+
+    if (Number.isNaN(date.getTime())) {
+        return "";
+    }
+
+    const offset = date.getTimezoneOffset();
+
+    const localDate = new Date(date.getTime() - offset * 60 * 1000);
+
+    return localDate.toISOString().slice(0, 16);
+}
+
+function normalizeQuestion(question: QuestionState): QuestionState {
+    return {
+        questionId: question.questionId || crypto.randomUUID(),
+        order: question.order,
+        question: question.question ?? "",
+        type: question.type,
+        points: question.points ?? 10,
+        required: question.required ?? true,
+
+        selectionType: question.selectionType,
+
+        options: question.options?.map((option) => ({
+            optionId: option.optionId || crypto.randomUUID(),
+            text: option.text ?? "",
+            isCorrect: option.isCorrect ?? false,
+        })),
+
+        language: question.language,
+        starterCode: question.starterCode,
+        inputDescription: question.inputDescription,
+        outputDescription: question.outputDescription,
+        constraints: question.constraints,
+
+        minLength: question.minLength,
+        maxLength: question.maxLength,
+        answerPlaceholder: question.answerPlaceholder,
+
+        autoEvaluate: question.autoEvaluate ?? false,
+        explanation: question.explanation,
+    };
+}
+
+/*
+ * ============================================================
  * COMPONENT
  * ============================================================
  */
 
-export default function EmployerAssessmentRequest() {
+export default function EmployerAssessmentEdit({
+    assessmentId,
+}: {
+    assessmentId: string;
+}) {
     const router = useRouter();
 
-    const { createAssessment, isCreatingAssessment, createAssessmentError } =
-        useAssessment({
-            role: "employer",
-        });
-
-    const [candidateSearch, setCandidateSearch] = useState("");
-
-    const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(
-        null,
-    );
-
     const {
-        data: employeeListData,
-        isLoading: isEmployeesLoading,
-        isFetching: isEmployeesFetching,
-        error: employeesError,
-    } = useEmployeeList({
-        search: candidateSearch,
-        status: "active",
-        sort: "name-asc",
-        page: 1,
-        limit: 20,
+        employerAssessment,
+        isEmployerAssessmentLoading,
+        isEmployerAssessmentFetching,
+        employerAssessmentError,
+        updateAssessment,
+        isUpdatingAssessment,
+        updateAssessmentError,
+    } = useAssessment({
+        role: "employer",
+        assessmentId,
     });
 
-    const employees = employeeListData?.employees ?? [];
     /*
-     * Assessment details
+     * ----------------------------------------------------------
+     * FORM STATE
+     * ----------------------------------------------------------
      */
+
     const [title, setTitle] = useState("");
     const [description, setDescription] = useState("");
     const [instructions, setInstructions] = useState("");
 
-    /*
-     * Skills
-     */
-    const [selectedSkills, setSelectedSkills] = useState<string[]>(["React"]);
+    const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
+
     const [customSkill, setCustomSkill] = useState("");
     const [showCustomSkill, setShowCustomSkill] = useState(false);
 
-    /*
-     * Questions
-     */
-    const [questions, setQuestions] = useState<QuestionState[]>([
-        createQuestion("short-text"),
-    ]);
+    const [questions, setQuestions] = useState<QuestionState[]>([]);
 
-    /*
-     * Timing
-     */
     const [startAt, setStartAt] = useState("");
     const [endAt, setEndAt] = useState("");
     const [durationMinutes, setDurationMinutes] = useState(60);
 
-    /*
-     * Timer
-     */
     const [timerEnabled, setTimerEnabled] = useState(true);
+
     const [autoSubmitOnExpiry, setAutoSubmitOnExpiry] = useState(true);
 
-    /*
-     * Security
-     */
     const [trackTabChanges, setTrackTabChanges] = useState(false);
+
     const [maxTabChanges, setMaxTabChanges] = useState<number | "">("");
 
-    /*
-     * Results
-     */
     const [showResultToEmployee, setShowResultToEmployee] = useState(false);
+
     const [showCorrectAnswersToEmployee, setShowCorrectAnswersToEmployee] =
         useState(false);
 
+    const [assessmentStatus, setAssessmentStatus] =
+        useState<AssessmentStatus>("published");
+
     /*
-     * UI
+     * ----------------------------------------------------------
+     * UI STATE
+     * ----------------------------------------------------------
      */
+
     const [openQuestion, setOpenQuestion] = useState(0);
     const [errorMessage, setErrorMessage] = useState("");
+
+    const [initialized, setInitialized] = useState(false);
+
+    /*
+     * ==========================================================
+     * LOAD ASSESSMENT INTO FORM
+     * ==========================================================
+     */
+
+    useEffect(() => {
+        if (initialized || !employerAssessment) {
+            return;
+        }
+
+        const response = employerAssessment as
+            | EmployerAssessmentResponse
+            | Assessment;
+
+        const assessment =
+            "assessment" in response ? response.assessment : response;
+
+        if (!assessment) {
+            return;
+        }
+
+        setTitle(assessment.title ?? "");
+        setDescription(assessment.description ?? "");
+        setInstructions(assessment.instructions ?? "");
+
+        setSelectedSkills(
+            Array.isArray(assessment.skills) ? assessment.skills : [],
+        );
+
+        setQuestions(
+            Array.isArray(assessment.questions) &&
+                assessment.questions.length > 0
+                ? assessment.questions
+                      .slice()
+                      .sort((a, b) => a.order - b.order)
+                      .map(normalizeQuestion)
+                : [createQuestion()],
+        );
+
+        setStartAt(toDateTimeLocal(assessment.timing?.startAt));
+
+        setEndAt(toDateTimeLocal(assessment.timing?.endAt));
+
+        setDurationMinutes(assessment.timing?.durationMinutes ?? 60);
+
+        setTimerEnabled(assessment.timer?.enabled ?? true);
+
+        setAutoSubmitOnExpiry(assessment.timer?.autoSubmitOnExpiry ?? true);
+
+        setTrackTabChanges(assessment.security?.trackTabChanges ?? false);
+
+        setMaxTabChanges(assessment.security?.maxTabChanges ?? "");
+
+        setShowResultToEmployee(
+            assessment.resultSettings?.showResultToEmployee ?? false,
+        );
+
+        setShowCorrectAnswersToEmployee(
+            assessment.resultSettings?.showCorrectAnswersToEmployee ?? false,
+        );
+
+        setAssessmentStatus(assessment.status ?? "published");
+
+        setInitialized(true);
+    }, [employerAssessment, initialized]);
 
     /*
      * ==========================================================
@@ -281,9 +462,13 @@ export default function EmployerAssessmentRequest() {
     const addQuestion = (type: QuestionType = "short-text") => {
         const question = createQuestion(type);
 
-        setQuestions((current) => [...current, question]);
+        setQuestions((current) => {
+            const next = [...current, question];
 
-        setOpenQuestion(questions.length);
+            setOpenQuestion(next.length - 1);
+
+            return next;
+        });
     };
 
     const removeQuestion = (index: number) => {
@@ -385,6 +570,8 @@ export default function EmployerAssessmentRequest() {
     };
 
     const changeQuestionType = (index: number, type: QuestionType) => {
+        const currentQuestion = questions[index];
+
         const nextQuestion = createQuestion(type);
 
         setQuestions((current) =>
@@ -392,9 +579,9 @@ export default function EmployerAssessmentRequest() {
                 questionIndex === index
                     ? {
                           ...nextQuestion,
-                          question: question.question,
-                          points: question.points,
-                          required: question.required,
+                          question: currentQuestion.question,
+                          points: currentQuestion.points,
+                          required: currentQuestion.required,
                       }
                     : question,
             ),
@@ -408,10 +595,6 @@ export default function EmployerAssessmentRequest() {
      */
 
     const validateForm = () => {
-        if (!selectedEmployee?._id) {
-            return "Please select a candidate.";
-        }
-
         if (!title.trim()) {
             return "Assessment title is required.";
         }
@@ -431,7 +614,7 @@ export default function EmployerAssessmentRequest() {
                 return `Question ${index + 1} cannot be empty.`;
             }
 
-            if (question.points <= 0) {
+            if (!Number.isInteger(question.points) || question.points <= 0) {
                 return `Question ${index + 1} must have at least 1 point.`;
             }
 
@@ -439,22 +622,34 @@ export default function EmployerAssessmentRequest() {
                 const options = question.options ?? [];
 
                 if (options.length < 2) {
-                    return `Question ${index + 1} must have at least two options.`;
+                    return `Question ${
+                        index + 1
+                    } must have at least two options.`;
                 }
 
                 if (options.some((option) => !option.text.trim())) {
-                    return `All options in question ${index + 1} must have text.`;
+                    return `All options in question ${
+                        index + 1
+                    } must have text.`;
                 }
 
-                if (!options.some((option) => option.isCorrect)) {
-                    return `Question ${index + 1} must have at least one correct option.`;
+                const correctOptions = options.filter(
+                    (option) => option.isCorrect,
+                );
+
+                if (correctOptions.length === 0) {
+                    return `Question ${
+                        index + 1
+                    } must have at least one correct option.`;
                 }
 
                 if (
                     question.selectionType === "single" &&
-                    options.filter((option) => option.isCorrect).length !== 1
+                    correctOptions.length !== 1
                 ) {
-                    return `Question ${index + 1} must have exactly one correct option.`;
+                    return `Question ${
+                        index + 1
+                    } must have exactly one correct option.`;
                 }
             }
 
@@ -463,7 +658,9 @@ export default function EmployerAssessmentRequest() {
                 question.maxLength !== undefined &&
                 question.minLength > question.maxLength
             ) {
-                return `Question ${index + 1} has an invalid character length range.`;
+                return `Question ${
+                    index + 1
+                } has an invalid character length range.`;
             }
         }
 
@@ -486,7 +683,7 @@ export default function EmployerAssessmentRequest() {
             return "Assessment end time must be after the start time.";
         }
 
-        if (durationMinutes <= 0 || !Number.isInteger(durationMinutes)) {
+        if (!Number.isInteger(durationMinutes) || durationMinutes <= 0) {
             return "Duration must be a positive whole number.";
         }
 
@@ -511,24 +708,21 @@ export default function EmployerAssessmentRequest() {
             return;
         }
 
-        // TypeScript narrowing after validation.
-        const employeeId = selectedEmployee?._id;
-
-        if (!employeeId) {
-            setErrorMessage("Please select a candidate.");
-            return;
-        }
-
         try {
             const payload = {
                 title: title.trim(),
+
                 description: description.trim(),
+
                 instructions: instructions.trim(),
+
                 skills: selectedSkills,
 
                 timing: {
                     startAt: new Date(startAt).toISOString(),
+
                     endAt: new Date(endAt).toISOString(),
+
                     durationMinutes,
                 },
 
@@ -539,6 +733,7 @@ export default function EmployerAssessmentRequest() {
 
                 security: {
                     trackTabChanges,
+
                     ...(trackTabChanges && maxTabChanges !== ""
                         ? {
                               maxTabChanges,
@@ -548,26 +743,38 @@ export default function EmployerAssessmentRequest() {
 
                 questions: questions.map((question, index) => ({
                     questionId: question.questionId,
+
                     order: index + 1,
+
                     question: question.question.trim(),
+
                     type: question.type,
+
                     points: question.points,
+
                     required: question.required,
 
                     ...(question.type === "mcq" && {
                         selectionType: question.selectionType,
+
                         options: (question.options ?? []).map((option) => ({
                             optionId: option.optionId,
+
                             text: option.text.trim(),
+
                             isCorrect: option.isCorrect,
                         })),
                     }),
 
                     ...(question.type === "coding" && {
                         language: question.language,
+
                         starterCode: question.starterCode,
+
                         inputDescription: question.inputDescription,
+
                         outputDescription: question.outputDescription,
+
                         constraints: question.constraints,
                     }),
 
@@ -577,9 +784,11 @@ export default function EmployerAssessmentRequest() {
                         ...(question.minLength !== undefined && {
                             minLength: question.minLength,
                         }),
+
                         ...(question.maxLength !== undefined && {
                             maxLength: question.maxLength,
                         }),
+
                         ...(question.answerPlaceholder && {
                             answerPlaceholder: question.answerPlaceholder,
                         }),
@@ -594,23 +803,23 @@ export default function EmployerAssessmentRequest() {
                     }),
                 })),
 
-                assignedEmployees: [
-                    {
-                        employeeId,
-                    },
-                ],
-
                 resultSettings: {
                     showResultToEmployee,
+
                     showCorrectAnswersToEmployee,
                 },
 
-                status: "published",
+                status: assessmentStatus,
             };
 
-            await createAssessment(payload);
+            await updateAssessment({
+                assessmentId,
+                payload,
+            });
 
-            router.push("/services/employer/assessments?created=true");
+            router.push(
+                `/services/employer/assessments/${assessmentId}?updated=true`,
+            );
         } catch (error) {
             const responseMessage = (
                 error as {
@@ -624,10 +833,85 @@ export default function EmployerAssessmentRequest() {
 
             setErrorMessage(
                 responseMessage ||
-                    "Unable to create the assessment. Please try again.",
+                    "Unable to update the assessment. Please try again.",
             );
         }
     };
+
+    /*
+     * ==========================================================
+     * LOADING
+     * ==========================================================
+     */
+
+    if (isEmployerAssessmentLoading) {
+        return (
+            <div className="space-y-5">
+                {[1, 2, 3, 4].map((item) => (
+                    <div
+                        key={item}
+                        className="animate-pulse rounded-2xl border border-border bg-card p-6"
+                    >
+                        <div className="h-5 w-1/3 rounded bg-muted" />
+
+                        <div className="mt-4 h-11 rounded bg-muted" />
+
+                        <div className="mt-4 h-20 rounded bg-muted" />
+                    </div>
+                ))}
+            </div>
+        );
+    }
+
+    /*
+     * ==========================================================
+     * ERROR
+     * ==========================================================
+     */
+
+    if (employerAssessmentError || !initialized) {
+        return (
+            <div className="rounded-2xl border border-destructive/20 bg-destructive/5 px-6 py-12 text-center">
+                <div className="mx-auto grid size-12 place-items-center rounded-xl bg-destructive/10 text-destructive">
+                    <AlertCircle className="size-5" />
+                </div>
+
+                <h2 className="mt-4 text-lg font-semibold">
+                    Unable to load assessment
+                </h2>
+
+                <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-muted-foreground">
+                    The assessment could not be loaded. Please return to the
+                    assessment and try again.
+                </p>
+
+                <Button asChild className="mt-5">
+                    <Link
+                        href={`/services/employer/assessments/${assessmentId}`}
+                    >
+                        Back to assessment
+                    </Link>
+                </Button>
+            </div>
+        );
+    }
+
+    /*
+     * ==========================================================
+     * CANDIDATE
+     * ==========================================================
+     */
+
+    const assessmentResponse = employerAssessment as
+        | EmployerAssessmentResponse
+        | Assessment;
+
+    const assessment =
+        "assessment" in assessmentResponse
+            ? assessmentResponse.assessment
+            : assessmentResponse;
+
+    const assignedEmployee = assessment.assignedEmployees?.[0];
 
     /*
      * ==========================================================
@@ -642,172 +926,58 @@ export default function EmployerAssessmentRequest() {
                     {errorMessage}
                 </div>
             )}
-            {createAssessmentError && !errorMessage && (
+
+            {updateAssessmentError && !errorMessage && (
                 <div className="rounded-xl border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive">
-                    Unable to create the assessment. Please check your
+                    Unable to update the assessment. Please check your
                     information and try again.
                 </div>
             )}
+
             {/* ==================================================
-    CANDIDATE
-================================================== */}
+                CANDIDATE
+            ================================================== */}
+
             <Section
                 icon={UserRound}
                 title="Candidate"
-                description="Choose an active candidate who will receive and complete this assessment."
+                description="The assigned candidate is shown here for reference. Candidate assignment is not changed from this edit form."
             >
-                <div className="space-y-4">
-                    {selectedEmployee ? (
-                        <div className="flex items-center gap-3 rounded-xl border border-primary/20 bg-primary/5 p-4">
-                            <div className="grid size-10 shrink-0 place-items-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
-                                {selectedEmployee.fullName
-                                    .charAt(0)
-                                    .toUpperCase()}
-                            </div>
-
-                            <div className="min-w-0 flex-1">
-                                <p className="truncate text-sm font-semibold">
-                                    {selectedEmployee.fullName}
-                                </p>
-
-                                <p className="truncate text-xs text-muted-foreground">
-                                    {selectedEmployee.email}
-                                </p>
-
-                                <p className="mt-1 text-xs text-muted-foreground">
-                                    ID: {selectedEmployee.employeeId}
-                                </p>
-                            </div>
-
-                            <button
-                                type="button"
-                                onClick={() => setSelectedEmployee(null)}
-                                className="grid size-8 shrink-0 place-items-center rounded-lg text-muted-foreground transition hover:bg-background hover:text-foreground"
-                                aria-label="Change candidate"
-                            >
-                                <X className="size-4" />
-                            </button>
+                {assignedEmployee ? (
+                    <div className="flex items-center gap-3 rounded-xl border border-primary/20 bg-primary/5 p-4">
+                        <div className="grid size-10 shrink-0 place-items-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
+                            {getEmployeeInitial(assignedEmployee)}
                         </div>
-                    ) : (
-                        <>
-                            <div className="relative">
-                                <input
-                                    className={inputClass}
-                                    placeholder="Search by candidate name or email..."
-                                    value={candidateSearch}
-                                    onChange={(event) =>
-                                        setCandidateSearch(event.target.value)
-                                    }
-                                />
-                            </div>
 
-                            <div className="overflow-hidden rounded-xl border border-border">
-                                {isEmployeesLoading || isEmployeesFetching ? (
-                                    <div className="space-y-3 p-4">
-                                        {[1, 2, 3].map((item) => (
-                                            <div
-                                                key={item}
-                                                className="animate-pulse rounded-lg bg-muted/50 p-4"
-                                            >
-                                                <div className="h-4 w-1/3 rounded bg-muted" />
-                                                <div className="mt-2 h-3 w-1/2 rounded bg-muted" />
-                                            </div>
-                                        ))}
-                                    </div>
-                                ) : employeesError ? (
-                                    <div className="p-4 text-sm text-destructive">
-                                        Unable to load candidates. Please try
-                                        again.
-                                    </div>
-                                ) : employees.length === 0 ? (
-                                    <div className="p-6 text-center">
-                                        <UserRound className="mx-auto size-8 text-muted-foreground/50" />
+                        <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-semibold">
+                                {getEmployeeName(assignedEmployee)}
+                            </p>
 
-                                        <p className="mt-2 text-sm font-medium">
-                                            No candidates found
-                                        </p>
+                            <p className="truncate text-xs text-muted-foreground">
+                                {getEmployeeEmail(assignedEmployee)}
+                            </p>
 
-                                        <p className="mt-1 text-xs text-muted-foreground">
-                                            Try a different name or email
-                                            search.
-                                        </p>
-                                    </div>
-                                ) : (
-                                    <div className="divide-y divide-border">
-                                        {employees.map((employee) => (
-                                            <button
-                                                key={
-                                                    employee._id ??
-                                                    employee.employeeId
-                                                }
-                                                type="button"
-                                                onClick={() =>
-                                                    setSelectedEmployee(
-                                                        employee,
-                                                    )
-                                                }
-                                                className="flex w-full items-center gap-3 p-4 text-left transition hover:bg-muted/40"
-                                            >
-                                                <div className="grid size-10 shrink-0 place-items-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
-                                                    {employee.fullName
-                                                        .charAt(0)
-                                                        .toUpperCase()}
-                                                </div>
-
-                                                <div className="min-w-0 flex-1">
-                                                    <p className="truncate text-sm font-medium">
-                                                        {employee.fullName}
-                                                    </p>
-
-                                                    <p className="truncate text-xs text-muted-foreground">
-                                                        {employee.email}
-                                                    </p>
-
-                                                    <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                                                        <span>
-                                                            ID:{" "}
-                                                            {
-                                                                employee.employeeId
-                                                            }
-                                                        </span>
-
-                                                        {employee.designation && (
-                                                            <span>
-                                                                {
-                                                                    employee.designation
-                                                                }
-                                                            </span>
-                                                        )}
-
-                                                        {employee.department && (
-                                                            <span>
-                                                                {
-                                                                    employee.department
-                                                                }
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                </div>
-
-                                                <span className="shrink-0 text-xs font-medium text-primary">
-                                                    Select
-                                                </span>
-                                            </button>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-                        </>
-                    )}
-                </div>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                                Assignment status: {assignedEmployee.status}
+                            </p>
+                        </div>
+                    </div>
+                ) : (
+                    <p className="text-sm text-muted-foreground">
+                        No candidate is currently assigned.
+                    </p>
+                )}
             </Section>
+
             {/* ==================================================
                 DETAILS
             ================================================== */}
+
             <Section
                 icon={FileText}
                 title="Assessment details"
-                description="Give the candidate enough context to understand what this assessment covers."
+                description="Update the information shown to the candidate."
             >
                 <div className="space-y-5">
                     <Field
@@ -835,13 +1005,15 @@ export default function EmployerAssessmentRequest() {
                     />
                 </div>
             </Section>
+
             {/* ==================================================
                 SKILLS
             ================================================== */}
+
             <Section
                 icon={CheckCircle2}
                 title="Skills"
-                description="Select the skills that this assessment is designed to evaluate."
+                description="Update the skills this assessment evaluates."
                 right={
                     <span className="text-sm font-medium text-primary">
                         {selectedSkills.length} selected
@@ -866,6 +1038,7 @@ export default function EmployerAssessmentRequest() {
                                 {selected && (
                                     <CheckCircle2 className="mr-1 inline size-3.5" />
                                 )}
+
                                 {skill}
                             </button>
                         );
@@ -881,6 +1054,7 @@ export default function EmployerAssessmentRequest() {
                                 className="rounded-full border border-primary bg-primary px-3 py-1.5 text-sm text-primary-foreground"
                             >
                                 {skill}
+
                                 <X className="ml-1 inline size-3.5" />
                             </button>
                         ))}
@@ -929,6 +1103,7 @@ export default function EmployerAssessmentRequest() {
                                         }
                                     }}
                                 />
+
                                 <Button type="button" onClick={addCustomSkill}>
                                     Add
                                 </Button>
@@ -937,13 +1112,15 @@ export default function EmployerAssessmentRequest() {
                     )}
                 </AnimatePresence>
             </Section>
+
             {/* ==================================================
                 QUESTIONS
             ================================================== */}
+
             <Section
                 icon={ListChecks}
                 title="Questions"
-                description="Build the questions the candidate will answer."
+                description="Update the questions, answer options, points, and question-specific configuration."
                 right={
                     <span className="text-sm font-medium text-primary">
                         {questions.length}{" "}
@@ -972,6 +1149,7 @@ export default function EmployerAssessmentRequest() {
                                             {question.question ||
                                                 "Untitled question"}
                                         </p>
+
                                         <p className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
                                             <Icon className="size-3.5" />
                                             {questionTypeLabels[question.type]}
@@ -1018,6 +1196,7 @@ export default function EmployerAssessmentRequest() {
                                                         <span className="mb-2 block text-sm font-medium">
                                                             Question
                                                         </span>
+
                                                         <textarea
                                                             className={`${textareaClass} min-h-24`}
                                                             placeholder="Write the question..."
@@ -1043,6 +1222,7 @@ export default function EmployerAssessmentRequest() {
                                                             <span className="mb-2 block text-sm font-medium">
                                                                 Question type
                                                             </span>
+
                                                             <select
                                                                 className={
                                                                     inputClass
@@ -1089,6 +1269,7 @@ export default function EmployerAssessmentRequest() {
                                                             <span className="mb-2 block text-sm font-medium">
                                                                 Points
                                                             </span>
+
                                                             <input
                                                                 className={
                                                                     inputClass
@@ -1139,171 +1320,26 @@ export default function EmployerAssessmentRequest() {
                                                     Required question
                                                 </label>
 
+                                                {/* MCQ */}
+
                                                 {question.type === "mcq" && (
-                                                    <div className="rounded-xl border border-border bg-muted/20 p-4">
-                                                        <div className="flex items-center justify-between gap-3">
-                                                            <div>
-                                                                <p className="text-sm font-medium">
-                                                                    Answer
-                                                                    options
-                                                                </p>
-                                                                <p className="mt-1 text-xs text-muted-foreground">
-                                                                    Mark the
-                                                                    correct
-                                                                    option(s).
-                                                                    Correct
-                                                                    answers
-                                                                    remain
-                                                                    server-side.
-                                                                </p>
-                                                            </div>
-
-                                                            <select
-                                                                className="h-10 rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-primary"
-                                                                value={
-                                                                    question.selectionType
-                                                                }
-                                                                onChange={(
-                                                                    event,
-                                                                ) =>
-                                                                    updateQuestion(
-                                                                        index,
-                                                                        {
-                                                                            selectionType:
-                                                                                event
-                                                                                    .target
-                                                                                    .value as SelectionType,
-                                                                        },
-                                                                    )
-                                                                }
-                                                            >
-                                                                <option value="single">
-                                                                    Single
-                                                                    select
-                                                                </option>
-                                                                <option value="multiple">
-                                                                    Multiple
-                                                                    select
-                                                                </option>
-                                                            </select>
-                                                        </div>
-
-                                                        <div className="mt-4 space-y-2">
-                                                            {(
-                                                                question.options ??
-                                                                []
-                                                            ).map(
-                                                                (
-                                                                    option,
-                                                                    optionIndex,
-                                                                ) => (
-                                                                    <div
-                                                                        key={
-                                                                            option.optionId
-                                                                        }
-                                                                        className="flex items-center gap-2"
-                                                                    >
-                                                                        <input
-                                                                            type={
-                                                                                question.selectionType ===
-                                                                                "multiple"
-                                                                                    ? "checkbox"
-                                                                                    : "radio"
-                                                                            }
-                                                                            name={`correct-option-${question.questionId}`}
-                                                                            checked={
-                                                                                option.isCorrect
-                                                                            }
-                                                                            onChange={() => {
-                                                                                if (
-                                                                                    question.selectionType ===
-                                                                                    "single"
-                                                                                ) {
-                                                                                    updateQuestion(
-                                                                                        index,
-                                                                                        {
-                                                                                            options:
-                                                                                                (
-                                                                                                    question.options ??
-                                                                                                    []
-                                                                                                ).map(
-                                                                                                    (
-                                                                                                        currentOption,
-                                                                                                    ) => ({
-                                                                                                        ...currentOption,
-                                                                                                        isCorrect:
-                                                                                                            currentOption.optionId ===
-                                                                                                            option.optionId,
-                                                                                                    }),
-                                                                                                ),
-                                                                                        },
-                                                                                    );
-                                                                                } else {
-                                                                                    updateOption(
-                                                                                        index,
-                                                                                        optionIndex,
-                                                                                        {
-                                                                                            isCorrect:
-                                                                                                !option.isCorrect,
-                                                                                        },
-                                                                                    );
-                                                                                }
-                                                                            }}
-                                                                            className="size-4 accent-primary"
-                                                                        />
-
-                                                                        <input
-                                                                            className={
-                                                                                inputClass
-                                                                            }
-                                                                            placeholder={`Option ${optionIndex + 1}`}
-                                                                            value={
-                                                                                option.text
-                                                                            }
-                                                                            onChange={(
-                                                                                event,
-                                                                            ) =>
-                                                                                updateOption(
-                                                                                    index,
-                                                                                    optionIndex,
-                                                                                    {
-                                                                                        text: event
-                                                                                            .target
-                                                                                            .value,
-                                                                                    },
-                                                                                )
-                                                                            }
-                                                                        />
-
-                                                                        <button
-                                                                            type="button"
-                                                                            onClick={() =>
-                                                                                removeOption(
-                                                                                    index,
-                                                                                    optionIndex,
-                                                                                )
-                                                                            }
-                                                                            className="grid size-9 shrink-0 place-items-center rounded-lg text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive"
-                                                                        >
-                                                                            <Trash2 className="size-4" />
-                                                                        </button>
-                                                                    </div>
-                                                                ),
-                                                            )}
-                                                        </div>
-
-                                                        <button
-                                                            type="button"
-                                                            onClick={() =>
-                                                                addOption(index)
-                                                            }
-                                                            className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-primary"
-                                                        >
-                                                            <Plus className="size-4" />
-                                                            Add option
-                                                        </button>
-                                                    </div>
+                                                    <MCQEditor
+                                                        question={question}
+                                                        questionIndex={index}
+                                                        updateQuestion={
+                                                            updateQuestion
+                                                        }
+                                                        updateOption={
+                                                            updateOption
+                                                        }
+                                                        addOption={addOption}
+                                                        removeOption={
+                                                            removeOption
+                                                        }
+                                                    />
                                                 )}
+
+                                                {/* CODING */}
 
                                                 {question.type === "coding" && (
                                                     <div className="space-y-4 rounded-xl border border-border bg-muted/20 p-4">
@@ -1421,6 +1457,8 @@ export default function EmployerAssessmentRequest() {
                                                     </div>
                                                 )}
 
+                                                {/* TEXT */}
+
                                                 {(
                                                     [
                                                         "short-text",
@@ -1534,11 +1572,13 @@ export default function EmployerAssessmentRequest() {
                         onChange={(event) => {
                             if (event.target.value) {
                                 addQuestion(event.target.value as QuestionType);
+
                                 event.target.value = "";
                             }
                         }}
                     >
                         <option value="">Add specific type...</option>
+
                         {Object.entries(questionTypeLabels).map(
                             ([value, label]) => (
                                 <option key={value} value={value}>
@@ -1549,13 +1589,15 @@ export default function EmployerAssessmentRequest() {
                     </select>
                 </div>
             </Section>
+
             {/* ==================================================
                 SCHEDULE
             ================================================== */}
+
             <Section
                 icon={Clock3}
                 title="Schedule & timing"
-                description="Define when the candidate can access the assessment and how long the attempt lasts."
+                description="Update when the candidate can access the assessment and how long the attempt lasts."
             >
                 <div className="grid gap-5 sm:grid-cols-3">
                     <DateTimeField
@@ -1581,9 +1623,11 @@ export default function EmployerAssessmentRequest() {
                     />
                 </div>
             </Section>
+
             {/* ==================================================
                 TIMER
             ================================================== */}
+
             <Section
                 icon={Clock3}
                 title="Timer"
@@ -1591,7 +1635,7 @@ export default function EmployerAssessmentRequest() {
             >
                 <ToggleRow
                     label="Enable assessment timer"
-                    description="The server will calculate the candidate's authoritative attempt expiry time."
+                    description="The server calculates the authoritative attempt expiry time."
                     checked={timerEnabled}
                     onChange={setTimerEnabled}
                 />
@@ -1607,9 +1651,11 @@ export default function EmployerAssessmentRequest() {
                     </div>
                 )}
             </Section>
+
             {/* ==================================================
                 SECURITY
             ================================================== */}
+
             <Section
                 icon={ShieldCheck}
                 title="Security"
@@ -1627,19 +1673,22 @@ export default function EmployerAssessmentRequest() {
                         <NumberField
                             label="Maximum tab changes"
                             value={maxTabChanges}
-                            onChange={(value) => setMaxTabChanges(value)}
+                            onChange={setMaxTabChanges}
                         />
+
                         <p className="mt-1.5 text-xs text-muted-foreground">
-                            This is recorded as an assessment setting. Reaching
-                            this value does not automatically submit or block
+                            This value is recorded as an assessment setting.
+                            Reaching it does not automatically submit or block
                             the attempt.
                         </p>
                     </div>
                 )}
             </Section>
+
             {/* ==================================================
                 RESULTS
             ================================================== */}
+
             <Section
                 icon={CheckCircle2}
                 title="Results"
@@ -1661,9 +1710,39 @@ export default function EmployerAssessmentRequest() {
                     />
                 </div>
             </Section>
+
             {/* ==================================================
-                SUBMIT
+                STATUS
             ================================================== */}
+
+            <Section
+                icon={ShieldCheck}
+                title="Assessment status"
+                description="Change the current lifecycle state of this assessment."
+            >
+                <select
+                    className={`${inputClass} max-w-sm`}
+                    value={assessmentStatus}
+                    onChange={(event) =>
+                        setAssessmentStatus(
+                            event.target.value as AssessmentStatus,
+                        )
+                    }
+                >
+                    <option value="draft">Draft</option>
+
+                    <option value="published">Published</option>
+
+                    <option value="closed">Closed</option>
+
+                    <option value="archived">Archived</option>
+                </select>
+            </Section>
+
+            {/* ==================================================
+                FOOTER
+            ================================================== */}
+
             <div className="flex flex-col-reverse gap-3 border-t border-border pt-6 sm:flex-row sm:items-center sm:justify-between">
                 <div className="text-sm text-muted-foreground">
                     <span className="font-medium text-foreground">
@@ -1681,22 +1760,31 @@ export default function EmployerAssessmentRequest() {
                     <Button
                         type="button"
                         variant="outline"
-                        onClick={() => router.back()}
-                        disabled={isCreatingAssessment}
+                        asChild
+                        disabled={isUpdatingAssessment}
                     >
-                        Cancel
+                        <Link
+                            href={`/services/employer/assessments/${assessmentId}`}
+                        >
+                            Cancel
+                        </Link>
                     </Button>
 
-                    <Button type="submit" disabled={isCreatingAssessment}>
-                        {isCreatingAssessment ? (
+                    <Button
+                        type="submit"
+                        disabled={
+                            isUpdatingAssessment || isEmployerAssessmentFetching
+                        }
+                    >
+                        {isUpdatingAssessment ? (
                             <>
                                 <span className="mr-2 size-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                                Creating...
+                                Saving...
                             </>
                         ) : (
                             <>
-                                <Send className="mr-2 size-4" />
-                                Create & send assessment
+                                <Save className="mr-2 size-4" />
+                                Save changes
                             </>
                         )}
                     </Button>
@@ -1704,6 +1792,163 @@ export default function EmployerAssessmentRequest() {
             </div>
         </form>
     );
+}
+
+/*
+ * ============================================================
+ * MCQ EDITOR
+ * ============================================================
+ */
+
+function MCQEditor({
+    question,
+    questionIndex,
+    updateQuestion,
+    updateOption,
+    addOption,
+    removeOption,
+}: {
+    question: QuestionState;
+    questionIndex: number;
+    updateQuestion: (index: number, updates: Partial<QuestionState>) => void;
+    updateOption: (
+        questionIndex: number,
+        optionIndex: number,
+        updates: Partial<OptionState>,
+    ) => void;
+    addOption: (questionIndex: number) => void;
+    removeOption: (questionIndex: number, optionIndex: number) => void;
+}) {
+    return (
+        <div className="rounded-xl border border-border bg-muted/20 p-4">
+            <div className="flex items-center justify-between gap-3">
+                <div>
+                    <p className="text-sm font-medium">Answer options</p>
+
+                    <p className="mt-1 text-xs text-muted-foreground">
+                        Mark the correct option(s). Correct answers are retained
+                        for employer evaluation.
+                    </p>
+                </div>
+
+                <select
+                    className="h-10 rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-primary"
+                    value={question.selectionType ?? "single"}
+                    onChange={(event) =>
+                        updateQuestion(questionIndex, {
+                            selectionType: event.target.value as SelectionType,
+                        })
+                    }
+                >
+                    <option value="single">Single select</option>
+
+                    <option value="multiple">Multiple select</option>
+                </select>
+            </div>
+
+            <div className="mt-4 space-y-2">
+                {(question.options ?? []).map((option, optionIndex) => (
+                    <div
+                        key={option.optionId}
+                        className="flex items-center gap-2"
+                    >
+                        <input
+                            type={
+                                question.selectionType === "multiple"
+                                    ? "checkbox"
+                                    : "radio"
+                            }
+                            name={`correct-option-${question.questionId}`}
+                            checked={option.isCorrect}
+                            onChange={() => {
+                                if (question.selectionType === "single") {
+                                    updateQuestion(questionIndex, {
+                                        options: (question.options ?? []).map(
+                                            (currentOption) => ({
+                                                ...currentOption,
+                                                isCorrect:
+                                                    currentOption.optionId ===
+                                                    option.optionId,
+                                            }),
+                                        ),
+                                    });
+                                } else {
+                                    updateOption(questionIndex, optionIndex, {
+                                        isCorrect: !option.isCorrect,
+                                    });
+                                }
+                            }}
+                            className="size-4 accent-primary"
+                        />
+
+                        <input
+                            className={inputClass}
+                            placeholder={`Option ${optionIndex + 1}`}
+                            value={option.text}
+                            onChange={(event) =>
+                                updateOption(questionIndex, optionIndex, {
+                                    text: event.target.value,
+                                })
+                            }
+                        />
+
+                        <button
+                            type="button"
+                            onClick={() =>
+                                removeOption(questionIndex, optionIndex)
+                            }
+                            className="grid size-9 shrink-0 place-items-center rounded-lg text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive"
+                        >
+                            <Trash2 className="size-4" />
+                        </button>
+                    </div>
+                ))}
+            </div>
+
+            <button
+                type="button"
+                onClick={() => addOption(questionIndex)}
+                className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-primary"
+            >
+                <Plus className="size-4" />
+                Add option
+            </button>
+        </div>
+    );
+}
+
+/*
+ * ============================================================
+ * HELPERS
+ * ============================================================
+ */
+
+function getEmployeeName(employee: AssignedEmployee) {
+    if (typeof employee.employeeId === "object") {
+        return (
+            employee.employeeId.fullName ||
+            employee.employeeId.email ||
+            employee.employeeId.employeeId ||
+            employee.employeeId._id ||
+            "Candidate"
+        );
+    }
+
+    return employee.employeeId;
+}
+
+function getEmployeeEmail(employee: AssignedEmployee) {
+    if (typeof employee.employeeId === "object") {
+        return employee.employeeId.email || "—";
+    }
+
+    return "—";
+}
+
+function getEmployeeInitial(employee: AssignedEmployee) {
+    const name = getEmployeeName(employee);
+
+    return name.charAt(0).toUpperCase();
 }
 
 /*
@@ -1773,7 +2018,7 @@ function Field({
 
 /*
  * ============================================================
- * TEXTAREA FIELD
+ * TEXTAREA
  * ============================================================
  */
 
