@@ -9,6 +9,7 @@ import {
     BriefcaseBusiness,
     CalendarDays,
     ClipboardCheck,
+    FileBarChart,
     IdCard,
     UsersRound,
 } from "lucide-react";
@@ -34,15 +35,15 @@ const employerNavigation = [
         requiresAuthorization: true,
     },
     {
-        href: "/services/employer/candidates",
-        label: "Candidates",
-        icon: UsersRound,
-        requiresAuthorization: true,
-    },
-    {
         href: "/services/employer/candidate-ids",
         label: "Candidate IDs",
         icon: IdCard,
+        requiresAuthorization: true,
+    },
+    {
+        href: "/services/employer/candidates-results",
+        label: "Candidates Results",
+        icon: FileBarChart,
         requiresAuthorization: true,
     },
 ];

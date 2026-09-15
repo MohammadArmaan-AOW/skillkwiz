@@ -4,10 +4,7 @@ import mongoose, { Schema, Types } from "mongoose";
 /*                              Attempt Status                                */
 /* -------------------------------------------------------------------------- */
 
-export type AssessmentAttemptStatus =
-    | "in-progress"
-    | "completed"
-    | "expired";
+export type AssessmentAttemptStatus = "in-progress" | "completed" | "expired";
 
 export type AssessmentSubmissionType = "manual" | "auto";
 
@@ -36,6 +33,31 @@ export interface IAssessmentAttemptAnswer {
      * Last time this answer was changed.
      */
     answeredAt: Date;
+
+    /**
+     * Final marks awarded for this question.
+     *
+     * Optional so existing attempts remain compatible.
+     */
+    awardedPoints?: number;
+
+    /**
+     * Optional note/feedback from the employer.
+     */
+    gradingNote?: string;
+
+    /**
+     * Whether the marks were manually overridden
+     * by the employer.
+     */
+    manuallyGraded?: boolean;
+
+    /**
+     * When the employer last graded/overrode
+     * this answer.
+     */
+    gradedAt?: Date;
+
 }
 
 /* -------------------------------------------------------------------------- */
@@ -146,6 +168,45 @@ const assessmentAttemptAnswerSchema =
                 type: Date,
                 required: true,
                 default: Date.now,
+            },
+
+            /**
+             * Final marks awarded for this question.
+             *
+             * This can be generated automatically or
+             * overridden by the employer.
+             */
+            awardedPoints: {
+                type: Number,
+                required: false,
+                min: 0,
+            },
+
+            /**
+             * Optional feedback/note from employer.
+             */
+            gradingNote: {
+                type: String,
+                required: false,
+                trim: false,
+            },
+
+            /**
+             * Whether the employer manually graded
+             * or overrode this question.
+             */
+            manuallyGraded: {
+                type: Boolean,
+                required: false,
+                default: false,
+            },
+
+            /**
+             * Last time this answer was manually graded.
+             */
+            gradedAt: {
+                type: Date,
+                required: false,
             },
         },
         {

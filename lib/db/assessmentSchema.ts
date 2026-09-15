@@ -267,42 +267,33 @@ export interface IAssessmentQuestion {
 /* -------------------------------------------------------------------------- */
 
 export interface IAssessmentAssignment {
-    /**
-     * Employee assigned to this assessment.
-     *
-     * References Employee._id.
-     */
     employeeId: Types.ObjectId;
 
-    /**
-     * When the employee was selected/assigned.
-     */
     assignedAt: Date;
 
-    /**
-     * When the assessment invitation email was sent.
-     */
     emailSentAt?: Date;
 
-    /**
-     * Assignment progress.
-     */
     status: AssessmentAssignmentStatus;
 
-    /**
-     * When the employee started the assessment.
-     *
-     * This is a high-level assignment timestamp.
-     *
-     * Detailed attempt information will live
-     * in AssessmentAttempt.
-     */
     startedAt?: Date;
 
-    /**
-     * When the employee completed/submitted.
-     */
     submittedAt?: Date;
+
+    /**
+     * Whether the employer shortlisted this
+     * employee for this assessment.
+     */
+    shortlisted?: boolean;
+
+    /**
+     * When the employer shortlisted this employee.
+     */
+    shortlistedAt?: Date;
+
+    /**
+     * When the shortlist email was successfully sent.
+     */
+    shortlistEmailSentAt?: Date;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -729,7 +720,18 @@ const assessmentAssignmentSchema = new Schema<IAssessmentAssignment>(
             required: true,
             default: "assigned",
         },
+        shortlisted: {
+            type: Boolean,
+            default: false,
+        },
 
+        shortlistedAt: {
+            type: Date,
+        },
+
+        shortlistEmailSentAt: {
+            type: Date,
+        },
         startedAt: {
             type: Date,
         },
