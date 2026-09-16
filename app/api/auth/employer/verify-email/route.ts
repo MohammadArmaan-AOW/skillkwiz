@@ -143,7 +143,7 @@ export async function POST(request: Request) {
         try {
             await sendEmail({
                 to: email,
-                subject: "Welcome email error:",
+                subject: "Welcome to SkillKwiz:",
                 html: emailHtml,
             });
         } catch (emailError) {
