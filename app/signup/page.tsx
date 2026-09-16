@@ -5,12 +5,9 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 
 import { motion, useReducedMotion } from "framer-motion";
+import { useResendEmployerOtp } from "@/hooks/queries/useResendEmployerOtp";
 
-import {
-    ArrowLeft,
-    CheckCircle2,
-    Sparkles,
-} from "lucide-react";
+import { ArrowLeft, CheckCircle2, Sparkles } from "lucide-react";
 
 import AuthPageForm from "@/components/auth-page-form";
 
@@ -23,8 +20,7 @@ export default function SignUpPage() {
     const router = useRouter();
     const reduceMotion = useReducedMotion();
 
-    const [isVerificationStep, setIsVerificationStep] =
-        useState(false);
+    const [isVerificationStep, setIsVerificationStep] = useState(false);
 
     const [email, setEmail] = useState("");
 
@@ -33,6 +29,12 @@ export default function SignUpPage() {
         isPending: isSigningUp,
         error: signUpError,
     } = useSignUp();
+
+    const {
+        mutate: resendOtp,
+        isPending: isResendingOtp,
+        error: resendOtpError,
+    } = useResendEmployerOtp();
 
     const {
         mutate: verifyEmail,
@@ -48,19 +50,20 @@ export default function SignUpPage() {
     }) => {
         signUp(data, {
             onSuccess: (response) => {
-                setEmail(
-                    response.data?.email ||
-                        data.email,
-                );
+                setEmail(response.data?.email || data.email);
 
                 setIsVerificationStep(true);
             },
         });
     };
 
-    const handleVerifyEmail = (
-        otp: string,
-    ) => {
+    const handleResendOtp = () => {
+        resendOtp({
+            email,
+        });
+    };
+
+    const handleVerifyEmail = (otp: string) => {
         verifyEmail(
             {
                 email,
@@ -68,9 +71,7 @@ export default function SignUpPage() {
             },
             {
                 onSuccess: () => {
-                    router.replace(
-                        "/services/employer/profile",
-                    );
+                    router.replace("/services/employer/profile");
                 },
             },
         );
@@ -114,16 +115,12 @@ export default function SignUpPage() {
 
                     <h2 className="mt-4 text-4xl font-semibold tracking-[-.04em] sm:text-5xl">
                         Build a stronger team with{" "}
-                        <span className="text-primary">
-                            confidence.
-                        </span>
+                        <span className="text-primary">confidence.</span>
                     </h2>
 
                     <p className="mt-4 text-base leading-7 text-muted-foreground">
-                        Create your SkillKwiz employer
-                        account to assess skills, manage
-                        candidates, and make better hiring
-                        decisions.
+                        Create your SkillKwiz employer account to assess skills,
+                        manage candidates, and make better hiring decisions.
                     </p>
 
                     <div className="mt-7 space-y-3">
@@ -148,23 +145,18 @@ export default function SignUpPage() {
                         <EmailVerificationForm
                             email={email}
                             isLoading={isVerifying}
-                            error={
-                                verifyEmailError?.message
-                            }
-                            onSubmit={
-                                handleVerifyEmail
-                            }
+                            error={verifyEmailError?.message}
+                            resendError={resendOtpError?.message}
+                            isResending={isResendingOtp}
+                            onSubmit={handleVerifyEmail}
+                            onResend={handleResendOtp}
                         />
                     ) : (
                         <AuthPageForm
                             mode="signup"
                             isLoading={isSigningUp}
-                            error={
-                                signUpError?.message
-                            }
-                            onSubmit={
-                                handleSignUp
-                            }
+                            error={signUpError?.message}
+                            onSubmit={handleSignUp}
                         />
                     )}
                 </div>

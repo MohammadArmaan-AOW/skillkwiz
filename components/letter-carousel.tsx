@@ -3,11 +3,20 @@
 import Image from "next/image";
 import Link from "next/link";
 
-import { ChevronLeft, ChevronRight, PlayCircle, Sparkles } from "lucide-react";
+import {
+    ChevronLeft,
+    ChevronRight,
+    PlayCircle,
+    Sparkles,
+} from "lucide-react";
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import {
+    AnimatePresence,
+    motion,
+    useReducedMotion,
+} from "framer-motion";
 
 import { Button } from "@/components/ui/button";
 
@@ -17,7 +26,6 @@ const SLIDE_DURATION = 6000;
 
 export default function LetterCarousel() {
     const [currentSlide, setCurrentSlide] = useState(0);
-    const [isPaused, setIsPaused] = useState(false);
 
     const reduceMotion = useReducedMotion();
 
@@ -36,26 +44,35 @@ export default function LetterCarousel() {
      */
 
     const showSlide = useCallback((index: number) => {
-        setCurrentSlide((index + slides.length) % slides.length);
+        setCurrentSlide(
+            (index + slides.length) % slides.length,
+        );
     }, []);
 
     /*
      * ---------------------------------------------------------
      * Autoplay
+     *
+     * IMPORTANT:
+     * Autoplay does NOT pause when the cursor is hovering.
      * ---------------------------------------------------------
      */
 
     useEffect(() => {
-        if (isPaused || reduceMotion) return;
+        if (reduceMotion) {
+            return;
+        }
 
         const interval = window.setInterval(() => {
-            setCurrentSlide((slide) => (slide + 1) % slides.length);
+            setCurrentSlide(
+                (slide) => (slide + 1) % slides.length,
+            );
         }, SLIDE_DURATION);
 
         return () => {
             window.clearInterval(interval);
         };
-    }, [isPaused, reduceMotion]);
+    }, [reduceMotion]);
 
     /*
      * ---------------------------------------------------------
@@ -66,19 +83,25 @@ export default function LetterCarousel() {
     useEffect(() => {
         const node = sectionRef.current;
 
-        if (!node) return;
+        if (!node) {
+            return;
+        }
 
         const onKeyDown = (event: KeyboardEvent) => {
             if (event.key === "ArrowLeft") {
                 event.preventDefault();
 
-                showSlide(currentSlideRef.current - 1);
+                showSlide(
+                    currentSlideRef.current - 1,
+                );
             }
 
             if (event.key === "ArrowRight") {
                 event.preventDefault();
 
-                showSlide(currentSlideRef.current + 1);
+                showSlide(
+                    currentSlideRef.current + 1,
+                );
             }
         };
 
@@ -95,30 +118,10 @@ export default function LetterCarousel() {
             tabIndex={0}
             aria-roledescription="carousel"
             aria-label="SkillKwiz highlights"
-            onMouseEnter={() => setIsPaused(true)}
-            onMouseLeave={() => setIsPaused(false)}
-            onFocus={(event) => {
-                if (
-                    !event.currentTarget.contains(
-                        event.relatedTarget as Node | null,
-                    )
-                ) {
-                    setIsPaused(true);
-                }
-            }}
-            onBlur={(event) => {
-                if (
-                    !event.currentTarget.contains(
-                        event.relatedTarget as Node | null,
-                    )
-                ) {
-                    setIsPaused(false);
-                }
-            }}
             className="
                 relative
-                h-[100svh]
-                min-h-[680px]
+                h-[100dvh]
+                min-h-0
                 w-full
                 overflow-hidden
                 bg-background
@@ -129,12 +132,17 @@ export default function LetterCarousel() {
                 FULL PAGE IMAGE
             ====================================================== */}
 
-            <AnimatePresence initial={false} mode="sync">
+            <AnimatePresence
+                initial={false}
+                mode="sync"
+            >
                 <motion.div
                     key={activeSlide.title}
                     initial={
                         reduceMotion
-                            ? { opacity: 1 }
+                            ? {
+                                  opacity: 1,
+                              }
                             : {
                                   opacity: 0,
                                   scale: 1.035,
@@ -148,16 +156,30 @@ export default function LetterCarousel() {
                         opacity: 0,
                     }}
                     transition={{
-                        duration: reduceMotion ? 0 : 0.8,
-                        ease: [0.22, 1, 0.36, 1],
+                        duration: reduceMotion
+                            ? 0
+                            : 0.8,
+                        ease: [
+                            0.22,
+                            1,
+                            0.36,
+                            1,
+                        ],
                     }}
-                    className="absolute inset-0"
+                    className="
+                        absolute
+                        inset-0
+                    "
                 >
                     <Image
-                        src={activeSlide.backgroundImage}
+                        src={
+                            activeSlide.backgroundImage
+                        }
                         alt=""
                         fill
-                        priority={currentSlide === 0}
+                        priority={
+                            currentSlide === 0
+                        }
                         sizes="100vw"
                         className="
                             object-cover
@@ -269,7 +291,12 @@ export default function LetterCarousel() {
                         }
                         transition={{
                             duration: 0.5,
-                            ease: [0.22, 1, 0.36, 1],
+                            ease: [
+                                0.22,
+                                1,
+                                0.36,
+                                1,
+                            ],
                         }}
                         className="max-w-xl"
                     >
@@ -317,6 +344,7 @@ export default function LetterCarousel() {
                                     text-secondary
                                 "
                             />
+
                             SkillKwiz platform
                         </motion.div>
 
@@ -355,7 +383,11 @@ export default function LetterCarousel() {
                                 sm:text-lg
                             "
                         >
-                            {SLIDE_COPY[activeSlide.title]}
+                            {
+                                SLIDE_COPY[
+                                    activeSlide.title
+                                ]
+                            }
                         </p>
 
                         {/* =================================================
@@ -385,6 +417,7 @@ export default function LetterCarousel() {
                             >
                                 <Link href="/services">
                                     Explore solutions
+
                                     <ChevronRight className="size-4" />
                                 </Link>
                             </Button>
@@ -406,6 +439,7 @@ export default function LetterCarousel() {
                             >
                                 <Link href="/about">
                                     <PlayCircle className="size-4" />
+
                                     Our story
                                 </Link>
                             </Button>
@@ -415,15 +449,18 @@ export default function LetterCarousel() {
             </div>
 
             {/* =====================================================
-                PREVIOUS — OUTSIDE CONTENT
-                VERTICAL CENTER OF SCREEN
+                PREVIOUS
             ====================================================== */}
 
             <Button
                 type="button"
                 variant="outline"
                 size="icon"
-                onClick={() => showSlide(currentSlide - 1)}
+                onClick={() =>
+                    showSlide(
+                        currentSlide - 1,
+                    )
+                }
                 aria-label="Previous slide"
                 className="
                     absolute
@@ -447,15 +484,18 @@ export default function LetterCarousel() {
             </Button>
 
             {/* =====================================================
-                NEXT — OUTSIDE CONTENT
-                VERTICAL CENTER OF SCREEN
+                NEXT
             ====================================================== */}
 
             <Button
                 type="button"
                 variant="outline"
                 size="icon"
-                onClick={() => showSlide(currentSlide + 1)}
+                onClick={() =>
+                    showSlide(
+                        currentSlide + 1,
+                    )
+                }
                 aria-label="Next slide"
                 className="
                     absolute
@@ -506,15 +546,21 @@ export default function LetterCarousel() {
                         gap-2
                     "
                 >
-                    {slides.map((slide, index) => (
-                        <button
-                            key={slide.title}
-                            type="button"
-                            role="tab"
-                            aria-selected={index === currentSlide}
-                            aria-label={`Show ${slide.title}`}
-                            onClick={() => showSlide(index)}
-                            className="
+                    {slides.map(
+                        (slide, index) => (
+                            <button
+                                key={slide.title}
+                                type="button"
+                                role="tab"
+                                aria-selected={
+                                    index ===
+                                    currentSlide
+                                }
+                                aria-label={`Show ${slide.title}`}
+                                onClick={() =>
+                                    showSlide(index)
+                                }
+                                className="
                                     group
                                     relative
                                     h-1.5
@@ -526,41 +572,47 @@ export default function LetterCarousel() {
                                     focus-visible:ring-2
                                     focus-visible:ring-primary-foreground
                                 "
-                        >
-                            <motion.span
-                                key={`${slide.title}-${currentSlide}`}
-                                className="
+                            >
+                                <motion.span
+                                    key={`${slide.title}-${currentSlide}`}
+                                    className="
                                         absolute
                                         inset-y-0
                                         left-0
                                         rounded-full
                                         bg-primary-foreground
                                     "
-                                initial={{
-                                    width: index < currentSlide ? "100%" : "0%",
-                                }}
-                                animate={{
-                                    width:
-                                        index === currentSlide &&
-                                        !isPaused &&
-                                        !reduceMotion
-                                            ? "100%"
-                                            : index < currentSlide
-                                              ? "100%"
-                                              : "0%",
-                                }}
-                                transition={{
-                                    duration:
-                                        index === currentSlide &&
-                                        !isPaused &&
-                                        !reduceMotion
-                                            ? SLIDE_DURATION / 1000
-                                            : 0.2,
-                                    ease: "linear",
-                                }}
-                            />
-                        </button>
-                    ))}
+                                    initial={{
+                                        width:
+                                            index <
+                                            currentSlide
+                                                ? "100%"
+                                                : "0%",
+                                    }}
+                                    animate={{
+                                        width:
+                                            index ===
+                                            currentSlide
+                                                ? "100%"
+                                                : index <
+                                                    currentSlide
+                                                  ? "100%"
+                                                  : "0%",
+                                    }}
+                                    transition={{
+                                        duration:
+                                            index ===
+                                            currentSlide &&
+                                            !reduceMotion
+                                                ? SLIDE_DURATION /
+                                                  1000
+                                                : 0.2,
+                                        ease: "linear",
+                                    }}
+                                />
+                            </button>
+                        ),
+                    )}
 
                     <span
                         className="
@@ -574,7 +626,9 @@ export default function LetterCarousel() {
                             text-primary-foreground/75
                         "
                     >
-                        {String(currentSlide + 1).padStart(2, "0")}
+                        {String(
+                            currentSlide + 1,
+                        ).padStart(2, "0")}
                     </span>
                 </div>
             </div>

@@ -2,19 +2,10 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import {
-    ArrowUpRight,
-    Mail,
-    MapPin,
-    Phone,
-} from "lucide-react";
+import { ArrowUpRight, Mail, MapPin, Phone } from "lucide-react";
 import { motion, type Variants } from "framer-motion";
 
-import {
-    COMPANY_LINKS,
-    LEGAL_LINKS,
-    QUICK_LINKS,
-} from "@/lib/data/footer";
+import { COMPANY_LINKS, LEGAL_LINKS, QUICK_LINKS } from "@/lib/data/footer";
 
 export default function Footer() {
     const currentYear = new Date().getFullYear();
@@ -97,7 +88,7 @@ export default function Footer() {
                 amount: 0.15,
             }}
             variants={footerContainer}
-            className="bg-primary text-primary-foreground"
+            className="bg-secondary/60 dark:bg-secondary/40 text-primary-foreground"
         >
             {/* =========================================================
                 BRAND GRADIENT LINE
@@ -147,14 +138,6 @@ export default function Footer() {
                         >
                             <div className="relative h-[58px] w-[175px] sm:h-[64px] sm:w-[195px]">
                                 {/* Light theme */}
-                                <Image
-                                    src="/images/logo.png"
-                                    alt="SkillKwiz"
-                                    fill
-                                    priority
-                                    sizes="195px"
-                                    className="object-contain dark:hidden"
-                                />
 
                                 {/* Dark theme */}
                                 <Image
@@ -163,25 +146,22 @@ export default function Footer() {
                                     fill
                                     priority
                                     sizes="195px"
-                                    className="hidden object-contain dark:block"
+                                    className=" object-contain"
                                 />
                             </div>
                         </Link>
 
                         {/* Description */}
-                        <p className="mt-4 max-w-sm text-sm leading-6 text-primary-foreground/70">
+                        <p className="mt-4 max-w-sm text-sm leading-6 text-primary-foreground">
                             SkillKwiz is transforming recruitment with
-                            innovative skill assessment solutions and
-                            practical support for modern hiring teams.
+                            innovative skill assessment solutions and practical
+                            support for modern hiring teams.
                         </p>
 
                         {/* Company Links */}
                         <div className="mt-6 flex flex-wrap gap-x-5 gap-y-2">
                             {COMPANY_LINKS.map((link) => (
-                                <FooterLink
-                                    key={link.href}
-                                    href={link.href}
-                                >
+                                <FooterLink key={link.href} href={link.href}>
                                     {link.label}
                                 </FooterLink>
                             ))}
@@ -233,7 +213,7 @@ export default function Footer() {
                                     href="mailto:info@skillkwiz.com"
                                     className="
                                         break-all
-                                        text-primary-foreground/70
+                                        text-primary-foreground
                                         transition-colors
                                         hover:text-primary-foreground
                                         hover:underline
@@ -248,7 +228,7 @@ export default function Footer() {
                                 <a
                                     href="tel:+919740377330"
                                     className="
-                                        text-primary-foreground/70
+                                        text-primary-foreground
                                         transition-colors
                                         hover:text-primary-foreground
                                         hover:underline
@@ -269,7 +249,7 @@ export default function Footer() {
                             Get Started
                         </h3>
 
-                        <p className="mt-5 text-sm leading-6 text-primary-foreground/70">
+                        <p className="mt-5 text-sm leading-6 text-primary-foreground">
                             Ready to simplify your hiring and skill assessment
                             process?
                         </p>
@@ -279,12 +259,12 @@ export default function Footer() {
                             className="
                                 group mt-5 inline-flex items-center gap-2
                                 rounded-full
-                                bg-secondary
+                                bg-primary
                                 px-5 py-2.5
                                 text-sm font-semibold
                                 text-secondary-foreground
                                 transition-all duration-200
-                                hover:bg-secondary/90
+                                hover:bg-primary/90
                                 focus-visible:outline-none
                                 focus-visible:ring-2
                                 focus-visible:ring-ring
@@ -293,7 +273,6 @@ export default function Footer() {
                             "
                         >
                             Explore Services
-
                             <ArrowUpRight
                                 aria-hidden="true"
                                 className="
@@ -331,9 +310,7 @@ export default function Footer() {
                         lg:px-10
                     "
                 >
-                    <p>
-                        © {currentYear} SkillKwiz. All rights reserved.
-                    </p>
+                    <p>© {currentYear} SkillKwiz. All rights reserved.</p>
 
                     <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
                         {LEGAL_LINKS.map((link) => (
@@ -369,17 +346,14 @@ type FooterLinkProps = {
     children: React.ReactNode;
 };
 
-function FooterLink({
-    href,
-    children,
-}: FooterLinkProps) {
+function FooterLink({ href, children }: FooterLinkProps) {
     return (
         <Link
             href={href}
             className="
                 group inline-flex items-center
                 text-sm
-                text-primary-foreground/70
+                text-primary-foreground
                 transition-colors duration-200
                 hover:text-primary-foreground
                 focus-visible:outline-none
@@ -418,21 +392,16 @@ type ContactItemProps = {
     children: React.ReactNode;
 };
 
-function ContactItem({
-    icon: Icon,
-    children,
-}: ContactItemProps) {
+function ContactItem({ icon: Icon, children }: ContactItemProps) {
     return (
         <div className="flex items-start gap-3">
             <Icon
                 aria-hidden="true"
-                className="mt-0.5 h-4 w-4 shrink-0 text-secondary"
+                className="mt-0.5 h-4 w-4 shrink-0 text-primary"
                 strokeWidth={1.8}
             />
 
-            <div className="leading-6">
-                {children}
-            </div>
+            <div className="leading-6">{children}</div>
         </div>
     );
 }

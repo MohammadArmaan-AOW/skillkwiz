@@ -1,10 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { motion, useReducedMotion } from "framer-motion";
-
 import {
     ArrowLeft,
     Eye,
@@ -20,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { useSignIn } from "@/hooks/queries/employer/useSignIn";
 import { useSignUp } from "@/hooks/queries/employer/useSignUp";
 import { useVerifyEmail } from "@/hooks/queries/employer/useVerifyEmail";
+import { useResendEmployerOtp } from "@/hooks/queries/useResendEmployerOtp";
 
 import {
     useEmployeeLogin,
@@ -73,6 +73,7 @@ export default function AuthPageForm({
     const [email, setEmail] = useState("");
     const [otp, setOtp] = useState("");
     const [isVerificationStep, setIsVerificationStep] = useState(false);
+    const [resendCooldown, setResendCooldown] = useState(0);
 
     /* Employee verification */
     const [employeeId, setEmployeeId] = useState("");
@@ -100,10 +101,34 @@ export default function AuthPageForm({
     } = useVerifyEmail();
 
     const {
+        mutate: resendEmployerOtp,
+        isPending: isResendingEmployerOtp,
+        error: resendEmployerOtpError,
+    } = useResendEmployerOtp();
+
+    const {
         mutate: signIn,
         isPending: isSigningIn,
         error: signInError,
     } = useSignIn();
+
+    /* ---------------------------------------------------------------------- */
+    /*                           Employer OTP Timer                            */
+    /* ---------------------------------------------------------------------- */
+
+    useEffect(() => {
+        if (resendCooldown <= 0) {
+            return;
+        }
+
+        const timer = window.setInterval(() => {
+            setResendCooldown((value) => Math.max(0, value - 1));
+        }, 1000);
+
+        return () => {
+            window.clearInterval(timer);
+        };
+    }, [resendCooldown]);
 
     /* ---------------------------------------------------------------------- */
     /*                               Employee                                 */
@@ -167,7 +192,10 @@ export default function AuthPageForm({
                 {
                     onSuccess: () => {
                         setEmail(formEmail);
+                        setOtp("");
+                        setResendCooldown(0);
                         setIsVerificationStep(true);
+
                         setMessage(
                             "We sent a 6-digit verification code to your email.",
                         );
@@ -226,11 +254,16 @@ export default function AuthPageForm({
                         setMessage(
                             "Unable to continue. Please try signing in again.",
                         );
+
                         return;
                     }
 
                     setEmployeeId(response.employee.employeeId);
+
                     setEmployeeEmail(response.employee.email);
+
+                    setEmployeeOtp("");
+
                     setIsEmployeeVerificationStep(true);
 
                     setMessage(
@@ -248,6 +281,10 @@ export default function AuthPageForm({
     const submitVerification = (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault();
 
+        if (otp.length !== 6) {
+            return;
+        }
+
         setMessage("");
 
         verifyEmail(
@@ -264,6 +301,35 @@ export default function AuthPageForm({
     };
 
     /* ---------------------------------------------------------------------- */
+    /*                         Employer Resend OTP                             */
+    /* ---------------------------------------------------------------------- */
+
+    const handleResendEmployerOtp = () => {
+        if (isResendingEmployerOtp || resendCooldown > 0 || !email) {
+            return;
+        }
+
+        setMessage("");
+        setOtp("");
+
+        resendEmployerOtp(
+            {
+                email,
+            },
+            {
+                onSuccess: (response) => {
+                    setMessage(
+                        response.message ||
+                            "A new verification code has been sent to your email.",
+                    );
+
+                    setResendCooldown(60);
+                },
+            },
+        );
+    };
+
+    /* ---------------------------------------------------------------------- */
     /*                           Employee OTP Verification                     */
     /* ---------------------------------------------------------------------- */
 
@@ -271,6 +337,10 @@ export default function AuthPageForm({
         event: React.FormEvent<HTMLFormElement>,
     ) => {
         event.preventDefault();
+
+        if (employeeOtp.length !== 6) {
+            return;
+        }
 
         setMessage("");
 
@@ -291,6 +361,7 @@ export default function AuthPageForm({
                             response.message ||
                                 "Unable to complete verification.",
                         );
+
                         return;
                     }
 
@@ -345,6 +416,7 @@ export default function AuthPageForm({
                     .
                 </p>
 
+                {/* Success / information message */}
                 {message && (
                     <motion.p
                         initial={{
@@ -361,6 +433,7 @@ export default function AuthPageForm({
                     </motion.p>
                 )}
 
+                {/* Verification error */}
                 {verifyEmailError && (
                     <motion.p
                         initial={{
@@ -377,6 +450,7 @@ export default function AuthPageForm({
                     </motion.p>
                 )}
 
+                {/* OTP form */}
                 <form onSubmit={submitVerification} className="mt-6 space-y-4">
                     <label className="block">
                         <span className="mb-2 block text-sm font-medium">
@@ -403,19 +477,57 @@ export default function AuthPageForm({
 
                     <Button
                         type="submit"
-                        disabled={isVerifyingEmail || otp.length !== 6}
+                        disabled={
+                            isVerifyingEmail ||
+                            isResendingEmployerOtp ||
+                            otp.length !== 6
+                        }
                         className="w-full rounded-lg"
                     >
                         {isVerifyingEmail ? "Verifying..." : "Verify Email"}
                     </Button>
                 </form>
 
+                {/* Resend error */}
+                {resendEmployerOtpError && (
+                    <motion.p
+                        initial={{
+                            opacity: 0,
+                            y: -5,
+                        }}
+                        animate={{
+                            opacity: 1,
+                            y: 0,
+                        }}
+                        className="mt-4 rounded-lg border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+                    >
+                        {resendEmployerOtpError.message}
+                    </motion.p>
+                )}
+
+                {/* Resend OTP */}
+                <button
+                    type="button"
+                    onClick={handleResendEmployerOtp}
+                    disabled={isResendingEmployerOtp || resendCooldown > 0}
+                    className="mt-5 w-full text-center text-sm font-medium text-secondary hover:underline disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                    {isResendingEmployerOtp
+                        ? "Sending..."
+                        : resendCooldown > 0
+                          ? `Resend verification code in ${resendCooldown}s`
+                          : "Resend verification code"}
+                </button>
+
+                {/* Back to signup */}
                 <button
                     type="button"
                     onClick={() => {
                         setIsVerificationStep(false);
                         setOtp("");
+                        setEmail("");
                         setMessage("");
+                        setResendCooldown(0);
                     }}
                     className="mt-5 flex w-full items-center justify-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground"
                 >
@@ -464,6 +576,7 @@ export default function AuthPageForm({
                     .
                 </p>
 
+                {/* Information message */}
                 {message && (
                     <motion.p
                         initial={{
@@ -480,6 +593,7 @@ export default function AuthPageForm({
                     </motion.p>
                 )}
 
+                {/* Verification error */}
                 {employeeOtpError && (
                     <motion.p
                         initial={{
@@ -496,6 +610,7 @@ export default function AuthPageForm({
                     </motion.p>
                 )}
 
+                {/* Resend error */}
                 {resendEmployeeOtpError && (
                     <motion.p
                         initial={{
@@ -512,6 +627,7 @@ export default function AuthPageForm({
                     </motion.p>
                 )}
 
+                {/* Employee OTP form */}
                 <form
                     onSubmit={submitEmployeeVerification}
                     className="mt-6 space-y-4"
@@ -542,7 +658,9 @@ export default function AuthPageForm({
                     <Button
                         type="submit"
                         disabled={
-                            isVerifyingEmployeeOtp || employeeOtp.length !== 6
+                            isVerifyingEmployeeOtp ||
+                            isResendingEmployeeOtp ||
+                            employeeOtp.length !== 6
                         }
                         className="w-full rounded-lg"
                     >
@@ -552,11 +670,13 @@ export default function AuthPageForm({
                     </Button>
                 </form>
 
+                {/* Employee resend */}
                 <button
                     type="button"
                     disabled={isResendingEmployeeOtp}
                     onClick={() => {
                         setMessage("");
+                        setEmployeeOtp("");
 
                         resendEmployeeOtp(
                             {
@@ -578,6 +698,7 @@ export default function AuthPageForm({
                         : "Resend verification code"}
                 </button>
 
+                {/* Back to login */}
                 <button
                     type="button"
                     onClick={() => {
@@ -636,6 +757,7 @@ export default function AuthPageForm({
                 {content.description}
             </p>
 
+            {/* Employer signup information */}
             {mode === "signup" && (
                 <div className="mt-5 flex items-start gap-3 rounded-xl border border-primary/20 bg-primary/10 p-3">
                     <Sparkles className="mt-0.5 size-4 shrink-0 text-primary" />
@@ -647,6 +769,7 @@ export default function AuthPageForm({
                 </div>
             )}
 
+            {/* General message */}
             {message && (
                 <motion.p
                     initial={{
@@ -663,6 +786,7 @@ export default function AuthPageForm({
                 </motion.p>
             )}
 
+            {/* General error */}
             {currentError && (
                 <motion.p
                     initial={{
