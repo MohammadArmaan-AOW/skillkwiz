@@ -2,17 +2,11 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import {
-    ArrowRight,
-    CheckCircle2,
-    Play,
-    Sparkles,
-} from "lucide-react";
+import { ArrowRight, CheckCircle2, Play, Sparkles } from "lucide-react";
 import { useRef, useState, type ReactNode } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import Reveal from "@/components/motion-reveal";
 import { values } from "@/lib/data/about";
 
 export default function AboutPage() {
@@ -32,7 +26,7 @@ export default function AboutPage() {
                 <div className="absolute inset-0 -z-20 bg-[radial-gradient(circle_at_82%_12%,hsl(var(--primary)/.24),transparent_28%),radial-gradient(circle_at_10%_90%,hsl(var(--secondary)/.12),transparent_25%)]" />
                 <div className="absolute inset-0 -z-10 bg-[linear-gradient(to_right,hsl(var(--border)/.35)_1px,transparent_1px),linear-gradient(to_bottom,hsl(var(--border)/.35)_1px,transparent_1px)] bg-[size:42px_42px] [mask-image:linear-gradient(to_bottom,black,transparent)]" />
                 <div className="mx-auto grid max-w-6xl gap-8 px-5 pb-12 pt-10 sm:px-6 lg:grid-cols-[1.08fr_.92fr] lg:items-center lg:pb-16 lg:pt-14">
-                    <Reveal>
+                    <>
                         <div className="inline-flex items-center gap-2 rounded-full border border-secondary/20 bg-secondary/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-secondary">
                             <Sparkles className="size-3.5" /> About SkillKwiz
                         </div>
@@ -81,9 +75,8 @@ export default function AboutPage() {
                                 </span>
                             ))}
                         </div>
-                    </Reveal>
-                    <Reveal
-                        delay={0.12}
+                    </>
+                    <div
                         className="relative mx-auto w-full max-w-md lg:max-w-none"
                     >
                         <div className="absolute -inset-5 -z-10 rounded-full bg-primary/15 blur-3xl" />
@@ -93,8 +86,8 @@ export default function AboutPage() {
                                 alt="SkillKwiz team collaborating"
                                 width={760}
                                 height={600}
-                                priority
                                 className="aspect-[1.15/1] w-full rounded-xl object-cover"
+                                loading="lazy"
                             />
                             <div className="absolute bottom-5 left-5 rounded-xl border border-white/20 bg-slate-950/75 px-4 py-3 text-white shadow-lg backdrop-blur-md dark:bg-background/80">
                                 <p className="text-xs font-medium uppercase tracking-wider text-white/65">
@@ -105,7 +98,7 @@ export default function AboutPage() {
                                 </p>
                             </div>
                         </div>
-                    </Reveal>
+                    </div>
                 </div>
             </section>
 
@@ -114,7 +107,7 @@ export default function AboutPage() {
                 aria-labelledby="values-heading"
             >
                 <div className="mx-auto max-w-6xl px-5 sm:px-6">
-                    <Reveal className="flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
+                    <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
                         <div>
                             <p className="text-sm font-semibold text-secondary uppercase tracking-wide">
                                 What guides us
@@ -130,27 +123,26 @@ export default function AboutPage() {
                             Every experience is shaped to bring more humanity
                             and evidence into the way talent is understood.
                         </p>
-                    </Reveal>
+                    </div>
                     <div className="mt-6 grid gap-4 md:grid-cols-3">
                         {values.map(
                             (
                                 { title, description, image, icon: Icon },
                                 index,
                             ) => (
-                                <Reveal key={title} delay={index * 0.08}>
+                                <div key={title}>
                                     <article className="group h-full rounded-2xl border border-border bg-card p-5 transition-colors duration-300 hover:border-primary/35 hover:bg-primary/[.035]">
                                         <div className="flex items-start justify-between">
-                                        
                                             <div className="flex items-center justify-center p-1 bg-primary/20 rounded-lg">
-
-                                            <Image
-                                                src={image}
-                                                alt=""
-                                                width={80}
-                                                height={80}
-                                                className="size-16 object-contain transition-transform duration-300 group-hover:scale-110"
+                                                <Image
+                                                    src={image}
+                                                    alt=""
+                                                    width={80}
+                                                    height={80}
+                                                    className="size-16 object-contain transition-transform duration-300 group-hover:scale-110"
+                                                    loading="lazy"
                                                 />
-                                                </div>
+                                            </div>
                                         </div>
                                         <h3 className="mt-4 text-lg font-semibold capitalize">
                                             {title}
@@ -159,7 +151,7 @@ export default function AboutPage() {
                                             {description}
                                         </p>
                                     </article>
-                                </Reveal>
+                                </div>
                             ),
                         )}
                     </div>
@@ -171,7 +163,7 @@ export default function AboutPage() {
                 className="border-y border-border/60 bg-muted/35 py-12 sm:py-16"
             >
                 <div className="mx-auto grid max-w-6xl gap-8 px-5 sm:px-6 lg:grid-cols-2 lg:items-center">
-                    <Reveal className="order-2 lg:order-1">
+                    <div className="order-2 lg:order-1">
                         <p className="text-sm font-semibold text-secondary uppercase tracking-wide">
                             Who we are
                         </p>
@@ -191,9 +183,8 @@ export default function AboutPage() {
                                 — Venugopal B A, CEO
                             </footer>
                         </blockquote>
-                    </Reveal>
-                    <Reveal
-                        delay={0.1}
+                    </div>
+                    <div
                         className="order-1 grid grid-cols-3 gap-2 lg:order-2"
                     >
                         {[
@@ -215,10 +206,11 @@ export default function AboutPage() {
                                     width={240}
                                     height={420}
                                     className="h-52 w-full object-cover sm:h-72"
+                                    loading="lazy"
                                 />
                             </motion.div>
                         ))}
-                    </Reveal>
+                    </div>
                 </div>
             </section>
 
@@ -227,7 +219,7 @@ export default function AboutPage() {
                 aria-labelledby="leadership-heading"
             >
                 <div className="mx-auto grid max-w-6xl gap-7 px-5 sm:px-6 lg:grid-cols-[.68fr_1.32fr] lg:items-center">
-                    <Reveal className="mx-auto w-full max-w-xs lg:mx-0">
+                    <div className="mx-auto w-full max-w-xs lg:mx-0">
                         <div className="overflow-hidden rounded-2xl border border-border bg-card p-2 shadow-sm">
                             <Image
                                 src="/images/aboutpage/Venugopal.png"
@@ -243,9 +235,9 @@ export default function AboutPage() {
                                 </p>
                             </div>
                         </div>
-                    </Reveal>
-                    
-                    <Reveal delay={0.1}>
+                    </div>
+
+                    <div>
                         <p className="text-sm font-semibold uppercase tracking-wide text-secondary">
                             Leadership
                         </p>
@@ -259,7 +251,7 @@ export default function AboutPage() {
                             <p>
                                 With 24 years in IT and senior leadership,
                                 Venugopal B A brings firsthand insight into one
-                                of the services sector’s most persistent
+                                of the services sector&apos;s most persistent
                                 challenges: understanding the skills people can
                                 truly bring to the work.
                             </p>
@@ -270,7 +262,7 @@ export default function AboutPage() {
                                 organizations grow together.
                             </p>
                         </div>
-                    </Reveal>
+                    </div>
                 </div>
             </section>
 
@@ -279,7 +271,7 @@ export default function AboutPage() {
                 aria-labelledby="film-heading"
             >
                 <div className="mx-auto max-w-5xl px-5 sm:px-6">
-                    <Reveal className="mb-5 text-center">
+                    <div className="mb-5 text-center">
                         <p className="text-sm font-semibold text-secondary tracking-wide uppercase">
                             Inside SkillKwiz
                         </p>
@@ -289,8 +281,8 @@ export default function AboutPage() {
                         >
                             See our purpose in motion.
                         </h2>
-                    </Reveal>
-                    <Reveal delay={0.1}>
+                    </div>
+                    <div>
                         <div className="relative overflow-hidden rounded-2xl border border-border bg-card p-1 shadow-xl shadow-black/5">
                             <video
                                 ref={videoRef}
@@ -324,7 +316,7 @@ export default function AboutPage() {
                                 </button>
                             )}
                         </div>
-                    </Reveal>
+                    </div>
                 </div>
             </section>
         </div>

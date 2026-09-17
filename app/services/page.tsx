@@ -2,8 +2,6 @@
 
 import Link from "next/link";
 
-import { motion, useReducedMotion } from "framer-motion";
-
 import { ArrowRight, CheckCircle2, ClipboardCheck } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -13,32 +11,15 @@ import { paths } from "@/lib/data/services";
 import { useEmployer } from "@/hooks/queries/employer/useEmployer";
 
 export default function ServicesPage() {
-    const reduce = useReducedMotion();
 
     const { isAuthenticated, isLoading: employerLoading } = useEmployer();
-
-    console.log(isAuthenticated);
 
     return (
         <main className="relative isolate min-h-screen overflow-hidden bg-background px-5 pb-14 pt-28 sm:px-6">
             <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_78%_12%,hsl(var(--primary)/.2),transparent_32%),radial-gradient(circle_at_12%_84%,hsl(var(--secondary)/.1),transparent_25%)]" />
 
-            <motion.div
-                initial={
-                    reduce
-                        ? false
-                        : {
-                              opacity: 0,
-                              y: 20,
-                          }
-                }
-                animate={{
-                    opacity: 1,
-                    y: 0,
-                }}
-                transition={{
-                    duration: 0.5,
-                }}
+            <div
+
                 className="mx-auto max-w-5xl"
             >
                 <div className="max-w-2xl">
@@ -73,30 +54,7 @@ export default function ServicesPage() {
                                     : href;
 
                             return (
-                                <motion.article
-                                    key={title}
-                                    initial={
-                                        reduce
-                                            ? false
-                                            : {
-                                                  opacity: 0,
-                                                  y: 16,
-                                              }
-                                    }
-                                    animate={{
-                                        opacity: 1,
-                                        y: 0,
-                                    }}
-                                    transition={{
-                                        delay: 0.12 + index * 0.08,
-                                    }}
-                                    whileHover={
-                                        reduce
-                                            ? undefined
-                                            : {
-                                                  y: -4,
-                                              }
-                                    }
+                                <article
                                     className="flex flex-col rounded-2xl border border-border bg-card p-6 shadow-sm transition-shadow hover:shadow-xl hover:shadow-primary/5"
                                 >
                                     <div className="flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
@@ -143,7 +101,7 @@ export default function ServicesPage() {
                                             <ArrowRight className="size-4" />
                                         </Link>
                                     </Button>
-                                </motion.article>
+                                </article>
                             );
                         },
                     )}
@@ -160,7 +118,7 @@ export default function ServicesPage() {
                     </Link>{" "}
                     to continue.
                 </div>
-            </motion.div>
+            </div>
         </main>
     );
 }

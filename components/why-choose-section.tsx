@@ -128,22 +128,6 @@ export default function WhyChooseSection() {
                         -translate-y-1/2
                     "
                 >
-                    {/* <Image
-                        src="/images/homepage/home_globe.gif"
-                        alt=""
-                        fill
-                        priority
-                        unoptimized
-                        sizes="
-                            (max-width: 640px) 125vw,
-                            (max-width: 1024px) 900px,
-                            1000px
-                        "
-                        className="
-                            object-contain
-                            opacity-30
-                        "
-                    /> */}
                 </motion.div>
 
                 {/* Globe halo */}
@@ -162,19 +146,17 @@ export default function WhyChooseSection() {
                         border-primary/10
                         shadow-[0_0_100px_hsl(var(--primary)/.08)]
                         sm:h-[750px]
-    sm:w-[750px]
-    md:h-[850px]
-    md:w-[850px]
-    lg:h-[950px]
-    lg:w-[950px]
+                        sm:w-[750px]
+                        md:h-[850px]
+                        md:w-[850px]
+                        lg:h-[950px]
+                        lg:w-[950px]
                     "
                 />
                 <Image
                         src="/images/homepage/home_globe.gif"
                         alt=""
                         fill
-                        priority
-                        unoptimized
                         sizes="
                             (max-width: 640px) 125vw,
                             (max-width: 800px) 800px,
@@ -184,6 +166,7 @@ export default function WhyChooseSection() {
                             object-contain
                             opacity-30
                         "
+                        loading="lazy"
                     />
             </div>
 

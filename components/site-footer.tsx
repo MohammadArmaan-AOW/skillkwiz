@@ -3,101 +3,21 @@
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowUpRight, Mail, MapPin, Phone } from "lucide-react";
-import { motion, type Variants } from "framer-motion";
 
 import { COMPANY_LINKS, LEGAL_LINKS, QUICK_LINKS } from "@/lib/data/footer";
 
 export default function Footer() {
     const currentYear = new Date().getFullYear();
 
-    /*
-     * Main footer reveal.
-     * The animation starts when the footer enters the viewport.
-     */
-    const footerContainer: Variants = {
-        hidden: {},
-        visible: {
-            transition: {
-                staggerChildren: 0.12,
-                delayChildren: 0.15,
-            },
-        },
-    };
-
-    /*
-     * Individual footer column animation.
-     */
-    const footerItem: Variants = {
-        hidden: {
-            opacity: 0,
-            y: 35,
-        },
-        visible: {
-            opacity: 1,
-            y: 0,
-            transition: {
-                duration: 0.7,
-                ease: [0.22, 1, 0.36, 1],
-            },
-        },
-    };
-
-    /*
-     * Top gradient line animation.
-     */
-    const gradientLine: Variants = {
-        hidden: {
-            scaleX: 0,
-            opacity: 0,
-        },
-        visible: {
-            scaleX: 1,
-            opacity: 1,
-            transition: {
-                duration: 0.9,
-                ease: [0.22, 1, 0.36, 1],
-            },
-        },
-    };
-
-    /*
-     * Bottom bar animation.
-     */
-    const bottomBar: Variants = {
-        hidden: {
-            opacity: 0,
-            y: 20,
-        },
-        visible: {
-            opacity: 1,
-            y: 0,
-            transition: {
-                duration: 0.6,
-                delay: 0.15,
-                ease: [0.22, 1, 0.36, 1],
-            },
-        },
-    };
-
     return (
-        <motion.footer
-            initial="hidden"
-            whileInView="visible"
-            viewport={{
-                once: true,
-                amount: 0.15,
-            }}
-            variants={footerContainer}
+        <footer
             className="bg-primary/95 dark:bg-primary/95 text-primary-foreground"
         >
             {/* =========================================================
                 BRAND GRADIENT LINE
             ========================================================== */}
 
-            <motion.div
-                aria-hidden="true"
-                variants={gradientLine}
-                style={{ transformOrigin: "left" }}
+            <div
                 className="h-1 w-full bg-primary-gradient"
             />
 
@@ -118,8 +38,7 @@ export default function Footer() {
                         BRAND / ABOUT
                     ================================================= */}
 
-                    <motion.div
-                        variants={footerItem}
+                    <div
                         className="sm:col-span-2 lg:col-span-1"
                     >
                         {/* Logo */}
@@ -166,13 +85,13 @@ export default function Footer() {
                                 </FooterLink>
                             ))}
                         </div>
-                    </motion.div>
+                    </div>
 
                     {/* =================================================
                         QUICK LINKS
                     ================================================= */}
 
-                    <motion.div variants={footerItem}>
+                    <div>
                         <h3 className="text-sm font-semibold uppercase tracking-[0.14em] text-primary-foreground">
                             Quick Links
                         </h3>
@@ -186,13 +105,13 @@ export default function Footer() {
                                 </li>
                             ))}
                         </ul>
-                    </motion.div>
+                    </div>
 
                     {/* =================================================
                         CONTACT
                     ================================================= */}
 
-                    <motion.div variants={footerItem}>
+                    <div>
                         <h3 className="text-sm font-semibold uppercase tracking-[0.14em] text-primary-foreground">
                             Contact
                         </h3>
@@ -238,13 +157,13 @@ export default function Footer() {
                                 </a>
                             </ContactItem>
                         </div>
-                    </motion.div>
+                    </div>
 
                     {/* =================================================
                         CTA
                     ================================================= */}
 
-                    <motion.div variants={footerItem}>
+                    <div >
                         <h3 className="text-sm font-semibold uppercase tracking-[0.14em] text-primary-foreground">
                             Get Started
                         </h3>
@@ -284,7 +203,7 @@ export default function Footer() {
                                 "
                             />
                         </Link>
-                    </motion.div>
+                    </div>
                 </div>
             </div>
 
@@ -292,8 +211,7 @@ export default function Footer() {
                 BOTTOM BAR
             ========================================================== */}
 
-            <motion.div
-                variants={bottomBar}
+            <div
                 className="border-t border-primary-foreground/10"
             >
                 <div
@@ -332,8 +250,8 @@ export default function Footer() {
                         ))}
                     </div>
                 </div>
-            </motion.div>
-        </motion.footer>
+            </div>
+        </footer>
     );
 }
 

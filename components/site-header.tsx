@@ -111,7 +111,7 @@ export default function SiteHeader() {
             <motion.nav
                 aria-label="Main navigation"
                 variants={navVariants}
-                initial="initial"
+                // initial="initial"
                 animate={isScrolled ? "scrolled" : "top"}
                 transition={{
                     y: {
