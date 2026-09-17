@@ -45,11 +45,19 @@ export async function POST(request: Request) {
         const validationResult = signupSchema.safeParse(body);
 
         if (!validationResult.success) {
+            const fieldErrors = validationResult.error.flatten().fieldErrors;
+
+            const firstError = Object.values(fieldErrors)
+                .flat()
+                .find((error): error is string => typeof error === "string");
+
             return NextResponse.json(
                 {
                     success: false,
-                    message: "Validation failed",
-                    errors: validationResult.error.flatten().fieldErrors,
+                    message:
+                        firstError ||
+                        "Please check the form and correct the highlighted fields.",
+                    errors: fieldErrors,
                 },
                 { status: 400 },
             );

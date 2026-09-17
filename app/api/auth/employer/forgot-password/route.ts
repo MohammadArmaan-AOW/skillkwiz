@@ -27,11 +27,17 @@ export async function POST(request: Request) {
         const validationResult = forgotPasswordSchema.safeParse(body);
 
         if (!validationResult.success) {
+            const errors = validationResult.error.flatten().fieldErrors;
+
+            const message =
+                Object.values(errors).flat().find(Boolean) ||
+                "Please check the entered information.";
+
             return NextResponse.json(
                 {
                     success: false,
-                    message: "Validation failed",
-                    errors: validationResult.error.flatten().fieldErrors,
+                    message,
+                    errors,
                 },
                 { status: 400 },
             );

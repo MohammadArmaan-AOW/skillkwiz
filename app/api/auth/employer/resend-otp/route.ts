@@ -21,34 +21,32 @@ const resendOtpSchema = z.object({
         .toLowerCase(),
 });
 
-export async function POST(
-    request: NextRequest,
-) {
+export async function POST(request: NextRequest) {
     try {
         await connectDB();
 
         const body = await request.json();
 
-        const validationResult =
-            resendOtpSchema.safeParse(body);
+        const validationResult = resendOtpSchema.safeParse(body);
 
         if (!validationResult.success) {
+            const errors = validationResult.error.flatten().fieldErrors;
+
+            const message =
+                Object.values(errors).flat().find(Boolean) ||
+                "Please check the entered information.";
+
             return NextResponse.json(
                 {
                     success: false,
-                    message: "Validation failed",
-                    errors:
-                        validationResult.error.flatten()
-                            .fieldErrors,
+                    message,
+                    errors,
                 },
-                {
-                    status: 400,
-                },
+                { status: 400 },
             );
         }
 
-        const { email } =
-            validationResult.data;
+        const { email } = validationResult.data;
 
         /**
          * -----------------------------
@@ -56,17 +54,15 @@ export async function POST(
          * -----------------------------
          */
 
-        const employer =
-            await Employer.findOne({
-                email,
-            });
+        const employer = await Employer.findOne({
+            email,
+        });
 
         if (!employer) {
             return NextResponse.json(
                 {
                     success: false,
-                    message:
-                        "No account was found with this email address.",
+                    message: "No account was found with this email address.",
                 },
                 {
                     status: 404,
@@ -84,8 +80,7 @@ export async function POST(
             return NextResponse.json(
                 {
                     success: false,
-                    message:
-                        "This email address is already verified.",
+                    message: "This email address is already verified.",
                     code: "EMAIL_ALREADY_VERIFIED",
                 },
                 {
@@ -100,10 +95,7 @@ export async function POST(
          * -----------------------------
          */
 
-        const emailOtp = randomInt(
-            100000,
-            1000000,
-        ).toString();
+        const emailOtp = randomInt(100000, 1000000).toString();
 
         /**
          * -----------------------------
@@ -111,11 +103,7 @@ export async function POST(
          * -----------------------------
          */
 
-        const emailOtpHash =
-            await bcrypt.hash(
-                emailOtp,
-                10,
-            );
+        const emailOtpHash = await bcrypt.hash(emailOtp, 10);
 
         /**
          * -----------------------------
@@ -123,13 +111,9 @@ export async function POST(
          * -----------------------------
          */
 
-        const emailOtpExpiresAt =
-            new Date(
-                Date.now() +
-                    OTP_EXPIRY_MINUTES *
-                        60 *
-                        1000,
-            );
+        const emailOtpExpiresAt = new Date(
+            Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000,
+        );
 
         /**
          * -----------------------------
@@ -137,11 +121,9 @@ export async function POST(
          * -----------------------------
          */
 
-        employer.emailOtpHash =
-            emailOtpHash;
+        employer.emailOtpHash = emailOtpHash;
 
-        employer.emailOtpExpiresAt =
-            emailOtpExpiresAt;
+        employer.emailOtpExpiresAt = emailOtpExpiresAt;
 
         await employer.save();
 
@@ -151,12 +133,10 @@ export async function POST(
          * -----------------------------
          */
 
-        const emailHtml =
-            employerVerificationOtpTemplate({
-                fullName:
-                    employer.fullName,
-                otp: emailOtp,
-            });
+        const emailHtml = employerVerificationOtpTemplate({
+            fullName: employer.fullName,
+            otp: emailOtp,
+        });
 
         /**
          * -----------------------------
@@ -167,25 +147,19 @@ export async function POST(
         try {
             await sendEmail({
                 to: employer.email,
-                subject:
-                    "Verify your SkillKwiz account",
+                subject: "Verify your SkillKwiz account",
                 html: emailHtml,
             });
         } catch (emailError) {
-            console.error(
-                "Employer resend OTP email error:",
-                emailError,
-            );
+            console.error("Employer resend OTP email error:", emailError);
 
             /*
              * Remove the OTP if the email
              * could not be delivered.
              */
-            employer.emailOtpHash =
-                undefined;
+            employer.emailOtpHash = undefined;
 
-            employer.emailOtpExpiresAt =
-                undefined;
+            employer.emailOtpExpiresAt = undefined;
 
             await employer.save();
 
@@ -215,8 +189,7 @@ export async function POST(
                     "A new verification code has been sent to your email address.",
                 data: {
                     email: employer.email,
-                    expiresInMinutes:
-                        OTP_EXPIRY_MINUTES,
+                    expiresInMinutes: OTP_EXPIRY_MINUTES,
                 },
             },
             {
@@ -224,10 +197,7 @@ export async function POST(
             },
         );
     } catch (error) {
-        console.error(
-            "Employer resend OTP error:",
-            error,
-        );
+        console.error("Employer resend OTP error:", error);
 
         return NextResponse.json(
             {

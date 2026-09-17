@@ -88,7 +88,7 @@ export default function Footer() {
                 amount: 0.15,
             }}
             variants={footerContainer}
-            className="bg-secondary/60 dark:bg-secondary/40 text-primary-foreground"
+            className="bg-primary/95 dark:bg-primary/95 text-primary-foreground"
         >
             {/* =========================================================
                 BRAND GRADIENT LINE
@@ -259,12 +259,12 @@ export default function Footer() {
                             className="
                                 group mt-5 inline-flex items-center gap-2
                                 rounded-full
-                                bg-primary
+                                bg-secondary
                                 px-5 py-2.5
                                 text-sm font-semibold
                                 text-secondary-foreground
                                 transition-all duration-200
-                                hover:bg-primary/90
+                                hover:bg-secondary/90
                                 focus-visible:outline-none
                                 focus-visible:ring-2
                                 focus-visible:ring-ring
@@ -397,7 +397,7 @@ function ContactItem({ icon: Icon, children }: ContactItemProps) {
         <div className="flex items-start gap-3">
             <Icon
                 aria-hidden="true"
-                className="mt-0.5 h-4 w-4 shrink-0 text-primary"
+                className="mt-0.5 h-4 w-4 shrink-0 text-secondary"
                 strokeWidth={1.8}
             />
 
