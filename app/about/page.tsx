@@ -3,8 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, CheckCircle2, Play, Sparkles } from "lucide-react";
-import { useRef, useState, type ReactNode } from "react";
-import { motion } from "framer-motion";
+import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { values } from "@/lib/data/about";
@@ -26,8 +25,8 @@ export default function AboutPage() {
                 <div className="absolute inset-0 -z-20 bg-[radial-gradient(circle_at_82%_12%,hsl(var(--primary)/.24),transparent_28%),radial-gradient(circle_at_10%_90%,hsl(var(--secondary)/.12),transparent_25%)]" />
                 <div className="absolute inset-0 -z-10 bg-[linear-gradient(to_right,hsl(var(--border)/.35)_1px,transparent_1px),linear-gradient(to_bottom,hsl(var(--border)/.35)_1px,transparent_1px)] bg-[size:42px_42px] [mask-image:linear-gradient(to_bottom,black,transparent)]" />
                 <div className="mx-auto grid max-w-6xl gap-8 px-5 pb-12 pt-10 sm:px-6 lg:grid-cols-[1.08fr_.92fr] lg:items-center lg:pb-16 lg:pt-14">
-                    <>
-                        <div className="inline-flex items-center gap-2 rounded-full border border-secondary/20 bg-secondary/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-secondary">
+                    <div className="flex flex-col">
+                        <div className="inline-flex w-fit items-center gap-2 rounded-full border border-secondary/20 bg-secondary/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-secondary">
                             <Sparkles className="size-3.5" /> About SkillKwiz
                         </div>
                         <h1 className="mt-4 max-w-2xl text-4xl font-semibold tracking-[-0.045em] sm:text-5xl lg:text-6xl">
@@ -75,10 +74,8 @@ export default function AboutPage() {
                                 </span>
                             ))}
                         </div>
-                    </>
-                    <div
-                        className="relative mx-auto w-full max-w-md lg:max-w-none"
-                    >
+                    </div>
+                    <div className="relative mx-auto w-full max-w-md lg:max-w-none">
                         <div className="absolute -inset-5 -z-10 rounded-full bg-primary/15 blur-3xl" />
                         <div className="relative overflow-hidden rounded-2xl border border-border/70 bg-card p-2 shadow-2xl shadow-primary/10">
                             <Image
@@ -125,35 +122,31 @@ export default function AboutPage() {
                         </p>
                     </div>
                     <div className="mt-6 grid gap-4 md:grid-cols-3">
-                        {values.map(
-                            (
-                                { title, description, image, icon: Icon },
-                                index,
-                            ) => (
-                                <div key={title}>
-                                    <article className="group h-full rounded-2xl border border-border bg-card p-5 transition-colors duration-300 hover:border-primary/35 hover:bg-primary/[.035]">
-                                        <div className="flex items-start justify-between">
-                                            <div className="flex items-center justify-center p-1 bg-primary/20 rounded-lg">
-                                                <Image
-                                                    src={image}
-                                                    alt=""
-                                                    width={80}
-                                                    height={80}
-                                                    className="size-16 object-contain transition-transform duration-300 group-hover:scale-110"
-                                                    loading="lazy"
-                                                />
-                                            </div>
-                                        </div>
-                                        <h3 className="mt-4 text-lg font-semibold capitalize">
-                                            {title}
-                                        </h3>
-                                        <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                                            {description}
-                                        </p>
-                                    </article>
+                        {values.map(({ title, description, image }) => (
+                            <article
+                                key={title}
+                                className="group h-full rounded-2xl border border-border bg-card p-5 transition-colors duration-300 hover:border-primary/35 hover:bg-primary/[.035]"
+                            >
+                                <div className="flex items-start justify-between">
+                                    <div className="flex items-center justify-center p-1 bg-primary/20 rounded-lg">
+                                        <Image
+                                            src={image}
+                                            alt=""
+                                            width={80}
+                                            height={80}
+                                            className="size-16 object-contain"
+                                            loading="lazy"
+                                        />
+                                    </div>
                                 </div>
-                            ),
-                        )}
+                                <h3 className="mt-4 text-lg font-semibold capitalize">
+                                    {title}
+                                </h3>
+                                <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                                    {description}
+                                </p>
+                            </article>
+                        ))}
                     </div>
                 </div>
             </section>
@@ -184,17 +177,14 @@ export default function AboutPage() {
                             </footer>
                         </blockquote>
                     </div>
-                    <div
-                        className="order-1 grid grid-cols-3 gap-2 lg:order-2"
-                    >
+                    <div className="order-1 grid grid-cols-3 gap-2 lg:order-2">
                         {[
                             "about_who_we_are-0.png",
                             "about_who_we_are-1.png",
                             "about_who_we_are-2.png",
                         ].map((file, index) => (
-                            <motion.div
+                            <div
                                 key={file}
-                                whileHover={{ y: -5 }}
                                 className={cn(
                                     "overflow-hidden rounded-xl border border-border bg-card",
                                     index === 1 && "translate-y-5",
@@ -208,7 +198,7 @@ export default function AboutPage() {
                                     className="h-52 w-full object-cover sm:h-72"
                                     loading="lazy"
                                 />
-                            </motion.div>
+                            </div>
                         ))}
                     </div>
                 </div>
@@ -227,6 +217,7 @@ export default function AboutPage() {
                                 width={440}
                                 height={440}
                                 className="aspect-square w-full rounded-xl object-cover object-top"
+                                loading="lazy"
                             />
                             <div className="px-2 pb-1 pt-3 flex items-center justify-center flex-col">
                                 <p className="font-semibold">Venugopal B A</p>
@@ -251,7 +242,7 @@ export default function AboutPage() {
                             <p>
                                 With 24 years in IT and senior leadership,
                                 Venugopal B A brings firsthand insight into one
-                                of the services sector&apos;s most persistent
+                                of the services sector’s most persistent
                                 challenges: understanding the skills people can
                                 truly bring to the work.
                             </p>
@@ -282,40 +273,38 @@ export default function AboutPage() {
                             See our purpose in motion.
                         </h2>
                     </div>
-                    <div>
-                        <div className="relative overflow-hidden rounded-2xl border border-border bg-card p-1 shadow-xl shadow-black/5">
-                            <video
-                                ref={videoRef}
-                                className="aspect-video w-full rounded-xl bg-muted object-cover"
-                                controls
-                                preload="metadata"
-                                poster="/images/aboutpage/thumbnail.png"
-                                onPlay={() => setIsPlaying(true)}
-                                onPause={() => setIsPlaying(false)}
-                                onEnded={() => setIsPlaying(false)}
+                    <div className="relative overflow-hidden rounded-2xl border border-border bg-card p-1 shadow-xl shadow-black/5">
+                        <video
+                            ref={videoRef}
+                            className="aspect-video w-full rounded-xl bg-muted object-cover"
+                            controls
+                            preload="metadata"
+                            poster="/images/aboutpage/thumbnail.png"
+                            onPlay={() => setIsPlaying(true)}
+                            onPause={() => setIsPlaying(false)}
+                            onEnded={() => setIsPlaying(false)}
+                        >
+                            <source
+                                src="/images/aboutpage/about_video.mp4"
+                                type="video/mp4"
+                            />
+                            Your browser does not support the video tag.
+                        </video>
+                        {!isPlaying && (
+                            <button
+                                type="button"
+                                onClick={handlePlay}
+                                aria-label="Play SkillKwiz video"
+                                className="absolute inset-1 flex items-center justify-center rounded-xl bg-background/10 transition-colors hover:bg-background/20"
                             >
-                                <source
-                                    src="/images/aboutpage/about_video.mp4"
-                                    type="video/mp4"
-                                />
-                                Your browser does not support the video tag.
-                            </video>
-                            {!isPlaying && (
-                                <button
-                                    type="button"
-                                    onClick={handlePlay}
-                                    aria-label="Play SkillKwiz video"
-                                    className="absolute inset-1 flex items-center justify-center rounded-xl bg-background/10 transition-colors hover:bg-background/20"
-                                >
-                                    <span className="flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg shadow-primary/30 transition-transform hover:scale-110">
-                                        <Play
-                                            className="ml-0.5 size-6"
-                                            fill="currentColor"
-                                        />
-                                    </span>
-                                </button>
-                            )}
-                        </div>
+                                <span className="flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg shadow-primary/30 transition-transform hover:scale-110">
+                                    <Play
+                                        className="ml-0.5 size-6"
+                                        fill="currentColor"
+                                    />
+                                </span>
+                            </button>
+                        )}
                     </div>
                 </div>
             </section>

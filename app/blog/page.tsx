@@ -8,7 +8,6 @@ import { useMemo, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { articles, categories, Category } from "@/lib/data/blog";
-import Reveal from "@/components/motion-reveal";
 
 function ArticleLink({ className }: { className?: string }) {
     return (
@@ -51,20 +50,20 @@ export default function BlogPage() {
                 <div className="absolute inset-0 -z-20 bg-[radial-gradient(circle_at_82%_5%,hsl(var(--primary)/.2),transparent_28%),radial-gradient(circle_at_15%_85%,hsl(var(--secondary)/.1),transparent_26%)]" />
                 <div className="absolute inset-0 -z-10 bg-[linear-gradient(to_right,hsl(var(--border)/.32)_1px,transparent_1px),linear-gradient(to_bottom,hsl(var(--border)/.32)_1px,transparent_1px)] bg-[size:44px_44px] [mask-image:linear-gradient(to_bottom,black,transparent)]" />
                 <div className="mx-auto max-w-6xl px-5 pb-12 pt-11 sm:px-6 sm:pb-16 lg:pt-14">
-                    <Reveal className="mx-auto max-w-3xl text-center">
+                    <div className="mx-auto max-w-3xl text-center">
                         <div className="inline-flex items-center gap-2 rounded-full border border-secondary/20 bg-secondary/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-secondary">
                             <Sparkles className="size-3.5" /> SkillKwiz journal
                         </div>
                         <h1 className="mt-4 text-4xl font-semibold tracking-[-0.045em] sm:text-5xl lg:text-6xl">
                             Ideas for the people building{" "}
-                            <span className="text-primary">what’s next.</span>
+                            <span className="text-primary">what&apos;s next.</span>
                         </h1>
                         <p className="mx-auto mt-4 max-w-2xl text-base leading-7 text-muted-foreground sm:text-lg">
                             Practical perspectives on skills, learning, and the
                             changing world of work.
                         </p>
-                    </Reveal>
-                    <Reveal delay={0.12} className="mx-auto mt-7 max-w-xl">
+                    </div>
+                    <div className="mx-auto mt-7 max-w-xl">
                         <label className="relative block">
                             <span className="sr-only">Search articles</span>
                             <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -77,12 +76,12 @@ export default function BlogPage() {
                                 className="h-12 w-full rounded-xl border border-border bg-card pl-11 pr-4 text-sm shadow-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
                             />
                         </label>
-                    </Reveal>
+                    </div>
                 </div>
             </section>
 
             <main className="mx-auto max-w-6xl px-5 py-12 sm:px-6 sm:py-16">
-                <Reveal>
+                <div>
                     <div className="mb-5 flex items-end justify-between gap-4">
                         <div>
                             <p className="text-sm font-semibold text-secondary uppercase tracking-wide">
@@ -128,13 +127,13 @@ export default function BlogPage() {
                             </div>
                         </div>
                     </article>
-                </Reveal>
+                </div>
 
                 <section
                     className="mt-12 sm:mt-16"
                     aria-labelledby="latest-heading"
                 >
-                    <Reveal className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                         <div>
                             <p className="text-sm font-semibold text-secondary uppercase tracking-wide">
                                 Explore the journal
@@ -170,7 +169,7 @@ export default function BlogPage() {
                                 </Button>
                             ))}
                         </div>
-                    </Reveal>
+                    </div>
                     <AnimatePresence mode="wait">
                         <motion.div
                             key={`${activeCategory}-${query}`}
@@ -246,7 +245,7 @@ export default function BlogPage() {
                     </AnimatePresence>
                 </section>
 
-                <Reveal className="mt-12 sm:mt-16">
+                <div className="mt-12 sm:mt-16">
                     <section className="relative overflow-hidden rounded-2xl border border-primary/15 bg-primary px-6 py-8 text-primary-foreground sm:px-9 sm:py-10">
                         <div className="absolute -right-10 -top-16 size-48 rounded-full bg-white/10 blur-2xl" />
                         <div className="relative flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
@@ -270,7 +269,7 @@ export default function BlogPage() {
                             </Button>
                         </div>
                     </section>
-                </Reveal>
+                </div>
             </main>
         </div>
     );
