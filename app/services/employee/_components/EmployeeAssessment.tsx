@@ -1,6 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+    useCallback,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+} from "react";
+
 import { useRouter } from "next/navigation";
 
 import {
@@ -35,9 +42,13 @@ import {
     CardTitle,
 } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import {
+    RadioGroup,
+    RadioGroupItem,
+} from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+
 import { useEmployeeMe } from "@/hooks/queries/useEmployeeAuth";
 
 interface EmployeeAssessmentProps {
@@ -56,14 +67,6 @@ type SelectionType = "single" | "multiple";
 interface AssessmentOption {
     optionId: string;
     text: string;
-
-    /*
-     * Optional because the current API may not expose it.
-     *
-     * When available after submission:
-     * true  = correct option
-     * false = incorrect option
-     */
     isCorrect?: boolean;
 }
 
@@ -149,16 +152,9 @@ interface EmployeeAssessmentResponse {
         status?: "in-progress" | "completed" | "expired";
         startedAt?: string;
         expiresAt?: string;
-
-        /*
-         * Supported if the API returns it.
-         */
         tabChangeCount?: number;
     };
 
-    /*
-     * Optional result returned after submission.
-     */
     result?: {
         score?: number;
         percentage?: number;
@@ -198,11 +194,7 @@ function formatTime(totalSeconds: number) {
     const safeSeconds = Math.max(0, totalSeconds);
 
     const hours = Math.floor(safeSeconds / 3600);
-
-    const minutes = Math.floor(
-        (safeSeconds % 3600) / 60,
-    );
-
+    const minutes = Math.floor((safeSeconds % 3600) / 60);
     const seconds = safeSeconds % 60;
 
     return [
@@ -270,8 +262,21 @@ export default function EmployeeAssessment({
     const [currentQuestionIndex, setCurrentQuestionIndex] =
         useState(0);
 
-    const [attemptStarted, setAttemptStarted] =
-        useState(false);
+    /*
+     * IMPORTANT:
+     *
+     * This is intentionally initialized as null.
+     *
+     * false means "there is definitely no active attempt".
+     * null means "we haven't restored the server attempt yet".
+     *
+     * This prevents the reload glitch where the UI renders
+     * "Assessment unavailable" before React restores the
+     * in-progress attempt.
+     */
+    const [attemptStarted, setAttemptStarted] = useState<
+        boolean | null
+    >(null);
 
     const [expiresAt, setExpiresAt] =
         useState<Date | null>(null);
@@ -279,8 +284,7 @@ export default function EmployeeAssessment({
     const [remainingSeconds, setRemainingSeconds] =
         useState<number | null>(null);
 
-    const [tabChangeCount, setTabChangeCount] =
-        useState(0);
+    const [tabChangeCount, setTabChangeCount] = useState(0);
 
     const [submitError, setSubmitError] =
         useState<string | null>(null);
@@ -292,15 +296,15 @@ export default function EmployeeAssessment({
         useState(false);
 
     /*
-     * Used to prevent duplicate reload recording.
+     * Prevent duplicate reload recording.
      */
     const reloadRecordedRef = useRef(false);
 
     /*
-     * Used to avoid registering visibility events during
-     * the same browser reload.
+     * Prevent duplicate tab-change requests caused by
+     * multiple browser events firing together.
      */
-    const pageWasHiddenRef = useRef(false);
+    const tabChangeRequestRef = useRef(false);
 
     const saveTimers = useRef<
         Record<string, ReturnType<typeof setTimeout>>
@@ -310,7 +314,7 @@ export default function EmployeeAssessment({
 
     /*
      * ------------------------------------------------------------
-     * Normalize response
+     * Normalize API response
      * ------------------------------------------------------------
      */
 
@@ -320,8 +324,8 @@ export default function EmployeeAssessment({
     );
 
     const assessment = assessmentResponse.assessment;
-
     const availability = assessmentResponse.availability;
+    const serverAttempt = assessmentResponse.attempt;
 
     /*
      * ------------------------------------------------------------
@@ -354,47 +358,91 @@ export default function EmployeeAssessment({
 
     /*
      * ------------------------------------------------------------
-     * Restore existing attempt
+     * RESTORE SERVER-SIDE ATTEMPT
      * ------------------------------------------------------------
+     *
+     * This is the most important part for reload handling.
+     *
+     * The server is authoritative.
+     *
+     * If an attempt already exists and is in-progress,
+     * we NEVER call startAssessment again.
      */
 
     useEffect(() => {
-        if (!assessmentResponse.attempt) {
+        /*
+         * Don't decide anything until the assessment response
+         * has actually arrived.
+         */
+        if (
+            isEmployeeAssessmentLoading ||
+            !assessment
+        ) {
             return;
         }
 
-        const attempt = assessmentResponse.attempt;
-
         /*
-         * Restore server-side tab count if available.
+         * Existing active attempt.
          */
         if (
-            typeof attempt.tabChangeCount ===
-            "number"
+            serverAttempt?.status === "in-progress"
         ) {
-            setTabChangeCount(
-                attempt.tabChangeCount,
-            );
-        }
-
-        if (attempt.status === "in-progress") {
             setAttemptStarted(true);
 
-            if (attempt.expiresAt) {
+            if (
+                typeof serverAttempt.tabChangeCount ===
+                "number"
+            ) {
+                setTabChangeCount(
+                    serverAttempt.tabChangeCount,
+                );
+            }
+
+            if (serverAttempt.expiresAt) {
                 const expiry = new Date(
-                    attempt.expiresAt,
+                    serverAttempt.expiresAt,
                 );
 
                 if (!Number.isNaN(expiry.getTime())) {
                     setExpiresAt(expiry);
                 }
             }
+
+            return;
         }
 
-        if (attempt.status === "completed") {
+        /*
+         * Completed attempt.
+         */
+        if (
+            serverAttempt?.status === "completed"
+        ) {
             setAttemptStarted(false);
+            return;
         }
-    }, [assessmentResponse.attempt]);
+
+        /*
+         * Expired attempt.
+         */
+        if (
+            serverAttempt?.status === "expired"
+        ) {
+            setAttemptStarted(false);
+            return;
+        }
+
+        /*
+         * No existing attempt.
+         *
+         * The employee may still be allowed to start it if
+         * availability is "available".
+         */
+        setAttemptStarted(false);
+    }, [
+        assessment,
+        isEmployeeAssessmentLoading,
+        serverAttempt,
+    ]);
 
     /*
      * ------------------------------------------------------------
@@ -487,7 +535,9 @@ export default function EmployeeAssessment({
             const questionId =
                 question.questionId;
 
-            if (saveTimers.current[questionId]) {
+            if (
+                saveTimers.current[questionId]
+            ) {
                 clearTimeout(
                     saveTimers.current[questionId],
                 );
@@ -495,7 +545,7 @@ export default function EmployeeAssessment({
 
             saveTimers.current[questionId] =
                 setTimeout(() => {
-                    saveAnswer({
+                    void saveAnswer({
                         assessmentId,
                         payload: {
                             questionId,
@@ -541,7 +591,10 @@ export default function EmployeeAssessment({
                 answerState,
             );
         },
-        [currentQuestion, persistAnswer],
+        [
+            currentQuestion,
+            persistAnswer,
+        ],
     );
 
     /*
@@ -569,18 +622,13 @@ export default function EmployeeAssessment({
 
             setAttemptStarted(true);
 
-            /*
-             * Restore any server value returned when
-             * starting the assessment.
-             */
             if (
                 typeof result.attempt
                     ?.tabChangeCount ===
                 "number"
             ) {
                 setTabChangeCount(
-                    result.attempt
-                        .tabChangeCount,
+                    result.attempt.tabChangeCount,
                 );
             }
 
@@ -591,7 +639,11 @@ export default function EmployeeAssessment({
                     result.attempt.expiresAt,
                 );
 
-                if (!Number.isNaN(expiry.getTime())) {
+                if (
+                    !Number.isNaN(
+                        expiry.getTime(),
+                    )
+                ) {
                     setExpiresAt(expiry);
                 }
             }
@@ -615,7 +667,7 @@ export default function EmployeeAssessment({
 
     useEffect(() => {
         if (
-            !attemptStarted ||
+            attemptStarted !== true ||
             !expiresAt
         ) {
             return;
@@ -633,9 +685,7 @@ export default function EmployeeAssessment({
                 ),
             );
 
-            setRemainingSeconds(
-                seconds,
-            );
+            setRemainingSeconds(seconds);
 
             if (
                 seconds <= 0 &&
@@ -671,22 +721,24 @@ export default function EmployeeAssessment({
 
     /*
      * ------------------------------------------------------------
-     * TAB / RELOAD TRACKING
-     * ------------------------------------------------------------
-     *
-     * Normal tab switch:
-     * visibilitychange -> hidden -> record tab change
-     *
-     * Browser reload:
-     * performance navigation type === reload
-     * -> record one tab change
-     *
-     * We use the server response as the displayed count.
+     * TAB CHANGE
      * ------------------------------------------------------------
      */
 
     const sendTabChange = useCallback(
         async () => {
+            /*
+             * Prevent duplicate requests.
+             */
+            if (
+                tabChangeRequestRef.current
+            ) {
+                return;
+            }
+
+            tabChangeRequestRef.current =
+                true;
+
             try {
                 const response =
                     await recordTabChange(
@@ -707,6 +759,13 @@ export default function EmployeeAssessment({
                     "Failed to record tab change:",
                     error,
                 );
+            } finally {
+                /*
+                 * Allow the next genuine tab
+                 * change to be recorded.
+                 */
+                tabChangeRequestRef.current =
+                    false;
             }
         },
         [
@@ -716,11 +775,24 @@ export default function EmployeeAssessment({
     );
 
     /*
-     * Detect an actual browser reload.
+     * ------------------------------------------------------------
+     * RELOAD DETECTION
+     * ------------------------------------------------------------
+     *
+     * IMPORTANT:
+     *
+     * We only run this after attemptStarted becomes
+     * true from the SERVER response.
+     *
+     * Therefore a reload will NOT create a new
+     * attempt and will NOT show "Assessment unavailable".
+     *
+     * It records exactly one tab change for the reload.
      */
+
     useEffect(() => {
         if (
-            !attemptStarted ||
+            attemptStarted !== true ||
             !assessment?.security
                 .trackTabChanges
         ) {
@@ -755,11 +827,14 @@ export default function EmployeeAssessment({
     ]);
 
     /*
-     * Detect normal tab/window switching.
+     * ------------------------------------------------------------
+     * NORMAL TAB / WINDOW SWITCHING
+     * ------------------------------------------------------------
      */
+
     useEffect(() => {
         if (
-            !attemptStarted ||
+            attemptStarted !== true ||
             !assessment?.security
                 .trackTabChanges
         ) {
@@ -768,50 +843,9 @@ export default function EmployeeAssessment({
 
         const handleVisibilityChange =
             () => {
-                if (
-                    document.visibilityState ===
-                    "hidden"
-                ) {
-                    pageWasHiddenRef.current =
-                        true;
-
-                    return;
-                }
-
                 /*
-                 * We only record on hidden.
-                 *
-                 * This prevents a visibilitychange
-                 * caused by returning to the page
-                 * from creating another count.
+                 * Only count leaving the page.
                  */
-            };
-
-        const handlePageHide = () => {
-            /*
-             * Don't record here because a real
-             * reload is already handled through
-             * PerformanceNavigationTiming.
-             */
-        };
-
-        document.addEventListener(
-            "visibilitychange",
-            handleVisibilityChange,
-        );
-
-        window.addEventListener(
-            "pagehide",
-            handlePageHide,
-        );
-
-        /*
-         * Separate hidden listener so the request
-         * happens immediately when the employee
-         * leaves the tab.
-         */
-        const handleHidden =
-            () => {
                 if (
                     document.visibilityState !==
                     "hidden"
@@ -820,8 +854,10 @@ export default function EmployeeAssessment({
                 }
 
                 /*
-                 * Browser reload:
-                 * do not send a second request here.
+                 * Do not count the hidden event
+                 * generated by browser reload.
+                 *
+                 * Reload is handled separately above.
                  */
                 const navigationEntry =
                     performance.getEntriesByType(
@@ -843,23 +879,13 @@ export default function EmployeeAssessment({
 
         document.addEventListener(
             "visibilitychange",
-            handleHidden,
+            handleVisibilityChange,
         );
 
         return () => {
             document.removeEventListener(
                 "visibilitychange",
                 handleVisibilityChange,
-            );
-
-            document.removeEventListener(
-                "visibilitychange",
-                handleHidden,
-            );
-
-            window.removeEventListener(
-                "pagehide",
-                handlePageHide,
             );
         };
     }, [
@@ -876,7 +902,7 @@ export default function EmployeeAssessment({
      */
 
     useEffect(() => {
-        if (!attemptStarted) {
+        if (attemptStarted !== true) {
             return;
         }
 
@@ -916,19 +942,19 @@ export default function EmployeeAssessment({
         setIsSubmittingLocally(true);
 
         try {
-            await submitAssessment(
-                assessmentId,
+            const response =
+                await submitAssessment(
+                    assessmentId,
+                );
+
+            sessionStorage.setItem(
+                "assessmentSubmissionResult",
+                JSON.stringify(
+                    response.data,
+                ),
             );
 
-            /*
-             * Backend remains responsible for:
-             *
-             * - required validation
-             * - MCQ grading
-             * - final score
-             * - percentage
-             */
-            router.replace(
+            router.push(
                 `/services/employee/assessment/${assessmentId}/submitted`,
             );
         } catch (error) {
@@ -953,7 +979,11 @@ export default function EmployeeAssessment({
      * ------------------------------------------------------------
      */
 
-    if (isEmployeeAssessmentLoading) {
+    if (
+        isEmployeeAuthLoading ||
+        isEmployeeAssessmentLoading ||
+        attemptStarted === null
+    ) {
         return (
             <main className="min-h-screen bg-background">
                 <div className="flex min-h-screen items-center justify-center px-6">
@@ -970,7 +1000,7 @@ export default function EmployeeAssessment({
 
     /*
      * ------------------------------------------------------------
-     * Error
+     * API error
      * ------------------------------------------------------------
      */
 
@@ -989,9 +1019,11 @@ export default function EmployeeAssessment({
                         </AlertTitle>
 
                         <AlertDescription>
-                            We could not load this assessment.
-                            Please try again or contact your
-                            employer if the problem continues.
+                            We could not load this
+                            assessment. Please try
+                            again or contact your
+                            employer if the problem
+                            continues.
                         </AlertDescription>
                     </Alert>
                 </div>
@@ -1012,6 +1044,12 @@ export default function EmployeeAssessment({
         availabilityStatus ===
         "available";
 
+    const isInProgress =
+        availabilityStatus ===
+        "in-progress" ||
+        serverAttempt?.status ===
+            "in-progress";
+
     const isNotStarted =
         availabilityStatus ===
         "not-started";
@@ -1026,7 +1064,27 @@ export default function EmployeeAssessment({
 
     const isCompleted =
         availabilityStatus ===
-        "completed";
+        "completed" ||
+        serverAttempt?.status ===
+            "completed";
+
+    /*
+     * ------------------------------------------------------------
+     * IMPORTANT AVAILABILITY FIX
+     * ------------------------------------------------------------
+     *
+     * If the server says the attempt is in progress,
+     * it is ALWAYS considered available to continue.
+     *
+     * This is what prevents:
+     *
+     * reload -> API returns in-progress ->
+     * UI says "Assessment unavailable"
+     */
+
+    const canContinueAttempt =
+        attemptStarted === true ||
+        isInProgress;
 
     /*
      * ------------------------------------------------------------
@@ -1035,7 +1093,7 @@ export default function EmployeeAssessment({
      */
 
     if (
-        !attemptStarted &&
+        !canContinueAttempt &&
         !isAvailable
     ) {
         let title =
@@ -1049,9 +1107,12 @@ export default function EmployeeAssessment({
                 "Assessment has not started";
 
             description =
-                assessment.timing.startAt
+                assessment.timing
+                    .startAt
                     ? `This assessment will become available on ${formatDateTime(
-                          assessment.timing.startAt,
+                          assessment
+                              .timing
+                              .startAt,
                       )}.`
                     : "The assessment is not available yet.";
         }
@@ -1106,7 +1167,9 @@ export default function EmployeeAssessment({
 
                                     <p className="mt-1 text-sm text-muted-foreground">
                                         {formatDateTime(
-                                            assessment.timing.startAt,
+                                            assessment
+                                                .timing
+                                                .startAt,
                                         )}
                                     </p>
                                 </div>
@@ -1120,11 +1183,16 @@ export default function EmployeeAssessment({
 
     /*
      * ------------------------------------------------------------
-     * Pre-start
+     * Pre-start screen
      * ------------------------------------------------------------
+     *
+     * Only show this when there is NO active attempt.
      */
 
-    if (!attemptStarted) {
+    if (
+        attemptStarted === false &&
+        !isInProgress
+    ) {
         return (
             <main className="min-h-screen bg-background">
                 <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
@@ -1137,7 +1205,9 @@ export default function EmployeeAssessment({
                                     </p>
 
                                     <CardTitle className="mt-1 text-2xl">
-                                        {assessment.title}
+                                        {
+                                            assessment.title
+                                        }
                                     </CardTitle>
 
                                     {assessment.description && (
@@ -1228,7 +1298,8 @@ export default function EmployeeAssessment({
 
                             {assessment.skills &&
                                 assessment.skills
-                                    .length > 0 && (
+                                    .length >
+                                    0 && (
                                     <section>
                                         <h2 className="text-base font-semibold">
                                             Skills assessed
@@ -1259,14 +1330,22 @@ export default function EmployeeAssessment({
                                 <ShieldAlert className="h-4 w-4" />
 
                                 <AlertTitle>
-                                    Before you start
+                                    Before you
+                                    start
                                 </AlertTitle>
 
                                 <AlertDescription>
-                                    Once you start, your assessment
-                                    timer will begin. Your attempt
-                                    will be subject to the configured
-                                    assessment time and security
+                                    Once you
+                                    start, your
+                                    assessment
+                                    timer will
+                                    begin. Your
+                                    attempt will
+                                    be subject to
+                                    the configured
+                                    assessment
+                                    time and
+                                    security
                                     settings.
                                 </AlertDescription>
                             </Alert>
@@ -1276,11 +1355,14 @@ export default function EmployeeAssessment({
                                     <AlertCircle className="h-4 w-4" />
 
                                     <AlertTitle>
-                                        Unable to start
+                                        Unable to
+                                        start
                                     </AlertTitle>
 
                                     <AlertDescription>
-                                        {submitError}
+                                        {
+                                            submitError
+                                        }
                                     </AlertDescription>
                                 </Alert>
                             )}
@@ -1302,7 +1384,8 @@ export default function EmployeeAssessment({
                                         </>
                                     ) : (
                                         <>
-                                            Start Assessment
+                                            Start
+                                            Assessment
                                             <ChevronRight className="ml-2 h-4 w-4" />
                                         </>
                                     )}
@@ -1355,10 +1438,6 @@ export default function EmployeeAssessment({
             return null;
         }
 
-        /*
-         * If the API doesn't expose isCorrect,
-         * we cannot determine the result safely.
-         */
         const hasCorrectAnswerData =
             question.options.some(
                 (option) =>
@@ -1383,9 +1462,8 @@ export default function EmployeeAssessment({
                 )
                 .sort();
 
-        const selectedOptionIds = [
-            ...selected,
-        ].sort();
+        const selectedOptionIds =
+            [...selected].sort();
 
         const isCorrect =
             correctOptionIds.length ===
@@ -1393,7 +1471,9 @@ export default function EmployeeAssessment({
             correctOptionIds.every(
                 (id, index) =>
                     id ===
-                    selectedOptionIds[index],
+                    selectedOptionIds[
+                        index
+                    ],
             );
 
         return {
@@ -1406,8 +1486,7 @@ export default function EmployeeAssessment({
     };
 
     const currentMcqResult =
-        currentQuestion?.type ===
-        "mcq"
+        currentQuestion?.type === "mcq"
             ? getMcqResult(
                   currentQuestion,
                   selectedOptions,
@@ -1418,9 +1497,7 @@ export default function EmployeeAssessment({
         optionId: string,
     ) => {
         updateAnswer({
-            selectedOptions: [
-                optionId,
-            ],
+            selectedOptions: [optionId],
         });
     };
 
@@ -1455,15 +1532,16 @@ export default function EmployeeAssessment({
         });
     };
 
-    const goToPreviousQuestion = () => {
-        setCurrentQuestionIndex(
-            (previous) =>
-                Math.max(
-                    0,
-                    previous - 1,
-                ),
-        );
-    };
+    const goToPreviousQuestion =
+        () => {
+            setCurrentQuestionIndex(
+                (previous) =>
+                    Math.max(
+                        0,
+                        previous - 1,
+                    ),
+            );
+        };
 
     const goToNextQuestion = () => {
         setCurrentQuestionIndex(
@@ -1514,7 +1592,8 @@ export default function EmployeeAssessment({
                                 <ShieldAlert className="h-4 w-4" />
 
                                 <span>
-                                    Tab changes:{" "}
+                                    Tab
+                                    changes:{" "}
                                     <strong>
                                         {
                                             tabChangeCount
@@ -1538,7 +1617,9 @@ export default function EmployeeAssessment({
                                     timerIsLow
                                         ? "border-destructive/40 text-destructive"
                                         : "",
-                                ].join(" ")}
+                                ].join(
+                                    " ",
+                                )}
                             >
                                 <Clock3 className="h-4 w-4" />
 
@@ -1692,7 +1773,8 @@ export default function EmployeeAssessment({
                                             "mcq" && (
                                             <div className="flex items-center gap-2 text-xs text-muted-foreground">
                                                 <CheckCircle2 className="h-4 w-4" />
-                                                Multiple choice
+                                                Multiple
+                                                choice
                                             </div>
                                         )}
 
@@ -1708,7 +1790,8 @@ export default function EmployeeAssessment({
                                             "project-report" && (
                                             <div className="flex items-center gap-2 text-xs text-muted-foreground">
                                                 <FileText className="h-4 w-4" />
-                                                Project report
+                                                Project
+                                                report
                                             </div>
                                         )}
                                     </div>
@@ -1745,7 +1828,8 @@ export default function EmployeeAssessment({
                                                                     ? "border-primary bg-primary/5"
                                                                     : "hover:bg-muted/40",
                                                                 correct &&
-                                                                assessment.resultSettings
+                                                                assessment
+                                                                    .resultSettings
                                                                     .showCorrectAnswersToEmployee
                                                                     ? "border-green-500/50 bg-green-500/5"
                                                                     : "",
@@ -1757,12 +1841,6 @@ export default function EmployeeAssessment({
                                                                 type="checkbox"
                                                                 checked={
                                                                     checked
-                                                                }
-                                                                disabled={
-                                                                    assessment.resultSettings
-                                                                        .showCorrectAnswersToEmployee &&
-                                                                    option.isCorrect ===
-                                                                        true
                                                                 }
                                                                 onChange={() =>
                                                                     handleMultipleChoice(
@@ -1782,11 +1860,11 @@ export default function EmployeeAssessment({
                                                                 {assessment
                                                                     .resultSettings
                                                                     .showCorrectAnswersToEmployee &&
-                                                                    option.isCorrect ===
-                                                                        true && (
+                                                                    correct && (
                                                                         <div className="mt-2 flex items-center gap-1 text-xs font-medium text-green-600">
                                                                             <CheckCircle2 className="h-3.5 w-3.5" />
-                                                                            Correct answer
+                                                                            Correct
+                                                                            answer
                                                                         </div>
                                                                     )}
                                                             </div>
@@ -1828,7 +1906,8 @@ export default function EmployeeAssessment({
                                                                         ? "border-primary bg-primary/5"
                                                                         : "hover:bg-muted/40",
                                                                     correct &&
-                                                                    assessment.resultSettings
+                                                                    assessment
+                                                                        .resultSettings
                                                                         .showCorrectAnswersToEmployee
                                                                         ? "border-green-500/50 bg-green-500/5"
                                                                         : "",
@@ -1856,11 +1935,11 @@ export default function EmployeeAssessment({
                                                                     {assessment
                                                                         .resultSettings
                                                                         .showCorrectAnswersToEmployee &&
-                                                                        option.isCorrect ===
-                                                                            true && (
+                                                                        correct && (
                                                                             <div className="mt-2 flex items-center gap-1 text-xs font-medium text-green-600">
                                                                                 <CheckCircle2 className="h-3.5 w-3.5" />
-                                                                                Correct answer
+                                                                                Correct
+                                                                                answer
                                                                             </div>
                                                                         )}
                                                                 </div>
@@ -1871,11 +1950,6 @@ export default function EmployeeAssessment({
                                             </RadioGroup>
                                         )}
 
-                                        /*
-                                         * Show MCQ result only when
-                                         * correct-answer information
-                                         * actually exists.
-                                         */
                                         {assessment
                                             .resultSettings
                                             .showCorrectAnswersToEmployee &&
@@ -1919,8 +1993,10 @@ export default function EmployeeAssessment({
 
                                                     {!currentMcqResult.isCorrect && (
                                                         <p className="mt-2 text-sm text-muted-foreground">
-                                                            The correct option
-                                                            is highlighted above.
+                                                            The correct
+                                                            option is
+                                                            highlighted
+                                                            above.
                                                         </p>
                                                     )}
                                                 </div>
@@ -2037,15 +2113,19 @@ export default function EmployeeAssessment({
                                             </div>
 
                                             <div className="text-xs text-muted-foreground">
-                                                Your code will be reviewed
-                                                by the employer.
+                                                Your code
+                                                will be
+                                                reviewed
+                                                by the
+                                                employer.
                                             </div>
                                         </div>
 
                                         {currentQuestion.starterCode && (
                                             <div className="overflow-hidden rounded-lg border">
                                                 <div className="border-b bg-muted/30 px-4 py-2 text-xs font-medium">
-                                                    Starter code
+                                                    Starter
+                                                    code
                                                 </div>
 
                                                 <pre className="overflow-x-auto bg-muted/10 p-4 text-sm leading-6">
@@ -2142,8 +2222,12 @@ export default function EmployeeAssessment({
                                     <div className="space-y-4">
                                         <div className="flex items-center gap-2 rounded-lg border bg-muted/20 p-4 text-sm text-muted-foreground">
                                             <FileText className="h-4 w-4 shrink-0" />
-                                            Your project report will be reviewed
-                                            by the employer.
+
+                                            Your project
+                                            report will
+                                            be reviewed
+                                            by the
+                                            employer.
                                         </div>
 
                                         <Textarea
@@ -2195,12 +2279,14 @@ export default function EmployeeAssessment({
                                     {isSavingAnswer ? (
                                         <span className="flex items-center gap-2">
                                             <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                            Saving answer...
+                                            Saving
+                                            answer...
                                         </span>
                                     ) : isCurrentQuestionAnswered ? (
                                         <span className="flex items-center gap-2">
                                             <CheckCircle2 className="h-3.5 w-3.5" />
-                                            Answer saved
+                                            Answer
+                                            saved
                                         </span>
                                     ) : (
                                         <span>
@@ -2214,7 +2300,8 @@ export default function EmployeeAssessment({
                                         <AlertCircle className="h-4 w-4" />
 
                                         <AlertTitle>
-                                            Submission error
+                                            Submission
+                                            error
                                         </AlertTitle>
 
                                         <AlertDescription>
@@ -2262,7 +2349,8 @@ export default function EmployeeAssessment({
                                             }
                                         >
                                             <Send className="mr-2 h-4 w-4" />
-                                            Submit Assessment
+                                            Submit
+                                            Assessment
                                         </Button>
                                     )}
                                 </div>
@@ -2327,7 +2415,8 @@ export default function EmployeeAssessment({
 
                         <CardContent className="space-y-5">
                             <p className="text-sm leading-6 text-muted-foreground">
-                                You have answered{" "}
+                                You have
+                                answered{" "}
                                 <strong>
                                     {
                                         answeredCount
@@ -2337,9 +2426,8 @@ export default function EmployeeAssessment({
                                 <strong>
                                     {
                                         questions.length
-                                    }
-                                {" "}
-                                questions.
+                                    }{" "}
+                                    questions.
                                 </strong>
                             </p>
 
@@ -2349,14 +2437,24 @@ export default function EmployeeAssessment({
                                     <AlertCircle className="h-4 w-4" />
 
                                     <AlertTitle>
-                                        Some questions are unanswered
+                                        Some questions
+                                        are
+                                        unanswered
                                     </AlertTitle>
 
                                     <AlertDescription>
-                                        You can still submit the
-                                        assessment. Required question
-                                        validation will be performed
-                                        by the server.
+                                        You can
+                                        still
+                                        submit
+                                        the
+                                        assessment.
+                                        Required
+                                        question
+                                        validation
+                                        will be
+                                        performed
+                                        by the
+                                        server.
                                     </AlertDescription>
                                 </Alert>
                             )}
@@ -2374,7 +2472,8 @@ export default function EmployeeAssessment({
                                         )
                                     }
                                 >
-                                    Continue Assessment
+                                    Continue
+                                    Assessment
                                 </Button>
 
                                 <Button

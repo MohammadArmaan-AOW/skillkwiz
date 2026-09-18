@@ -215,18 +215,20 @@ export function useAssessment({
     });
 
     const submitAssessmentMutation = useMutation({
-        mutationFn: submitEmployeeAssessment,
+    mutationFn: submitEmployeeAssessment,
 
-        onSuccess: (_data, assessmentId) => {
-            queryClient.invalidateQueries({
-                queryKey: assessmentQueryKeys.employee.detail(assessmentId),
-            });
+    onSuccess: (_data, assessmentId) => {
+        queryClient.invalidateQueries({
+            queryKey:
+                assessmentQueryKeys.employee.detail(assessmentId),
+        });
 
-            queryClient.invalidateQueries({
-                queryKey: assessmentQueryKeys.employee.lists(),
-            });
-        },
-    });
+        queryClient.invalidateQueries({
+            queryKey:
+                assessmentQueryKeys.employee.lists(),
+        });
+    },
+});
 
     const tabChangeMutation = useMutation({
         mutationFn: recordEmployeeAssessmentTabChange,

@@ -411,15 +411,19 @@ export async function POST(request: NextRequest, context: RouteContext) {
          * RESPONSE
          * ---------------------------------------------------------
          *
-         * Respect showResultToEmployee.
+         * Respect employer result settings.
          *
-         * We never expose:
-         * - isCorrect
-         * - correct option IDs
-         * - internal evaluation information
+         * MCQ evaluation is only returned AFTER submission.
+         *
+         * We never expose correct answers while the assessment
+         * is in progress.
          */
+
         const showResult =
             assessment.resultSettings?.showResultToEmployee === true;
+
+        const showCorrectAnswers =
+            assessment.resultSettings?.showCorrectAnswersToEmployee === true;
 
         const responseData: {
             attemptId: mongoose.Types.ObjectId;
@@ -427,15 +431,86 @@ export async function POST(request: NextRequest, context: RouteContext) {
             submittedAt: Date;
             score?: number;
             percentage?: number;
+            mcqResults?: {
+                questionId: string;
+                question: string;
+                isCorrect: boolean;
+                awardedPoints: number;
+                points: number;
+                selectedOptions: string[];
+                correctOptions?: string[];
+            }[];
         } = {
             attemptId: attempt._id,
             status: attempt.status,
             submittedAt: now,
         };
 
+        /*
+         * ---------------------------------------------------------
+         * RESULT
+         * ---------------------------------------------------------
+         */
+
         if (showResult) {
             responseData.score = score;
             responseData.percentage = percentage;
+
+            /*
+             * Build MCQ results only after submission.
+             */
+            responseData.mcqResults = assessment.questions
+                .filter((question) => question.type === "mcq")
+                .map((question) => {
+                    const submittedAnswer = attempt.answers.find(
+                        (item: IAssessmentAttemptAnswer) =>
+                            item.questionId === question.questionId,
+                    );
+
+                    const selectedOptions = [
+                        ...(submittedAnswer?.selectedOptions ?? []),
+                    ];
+
+                    const correctOptions = (question.options ?? [])
+                        .filter(
+                            (option: AssessmentQuestionOption) =>
+                                option.isCorrect,
+                        )
+                        .map(
+                            (option: AssessmentQuestionOption) =>
+                                option.optionId,
+                        );
+
+                    const sortedSelected = [...selectedOptions].sort();
+                    const sortedCorrect = [...correctOptions].sort();
+
+                    const isCorrect =
+                        sortedSelected.length === sortedCorrect.length &&
+                        sortedSelected.every(
+                            (optionId, index) =>
+                                optionId === sortedCorrect[index],
+                        );
+
+                    return {
+                        questionId: question.questionId,
+                        question: question.question,
+                        isCorrect,
+                        awardedPoints: isCorrect ? question.points : 0,
+                        points: question.points,
+
+                        selectedOptions,
+
+                        /*
+                         * Only expose the correct answer when the
+                         * employer explicitly enabled it.
+                         */
+                        ...(showCorrectAnswers
+                            ? {
+                                  correctOptions,
+                              }
+                            : {}),
+                    };
+                });
         }
 
         return NextResponse.json(
